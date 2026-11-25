@@ -8,6 +8,7 @@ urlpatterns = [
     path("menu/categories/<int:pk>/", views.CategoryDetailView.as_view(), name="staff-menu-category"),
     path("menu/items/", views.ItemListCreateView.as_view(), name="staff-menu-items"),
     path("menu/items/<int:pk>/", views.ItemDetailView.as_view(), name="staff-menu-item"),
+    path("menu/items/<int:pk>/image/", views.ItemImageView.as_view(), name="staff-menu-item-image"),
     path("menu/items/<int:pk>/archive/", views.ItemArchiveView.as_view(), name="staff-menu-item-archive"),
     path("menu/items/<int:pk>/availability/", views.ItemAvailabilityView.as_view(), name="staff-menu-item-availability"),
 ]

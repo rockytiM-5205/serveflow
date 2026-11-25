@@ -1,4 +1,7 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from apps.common.images import media_url
 
 from .models import MenuCategory, MenuItem
 
@@ -31,14 +34,19 @@ class RestaurantCategoryField(serializers.PrimaryKeyRelatedField):
 class ItemSerializer(serializers.ModelSerializer):
     category = RestaurantCategoryField(queryset=MenuCategory.objects.all())
     archived = serializers.BooleanField(source="is_archived", read_only=True)
+    image = serializers.SerializerMethodField(help_text="Path of the uploaded photo, or null. Upload with POST .../image/.")
 
     class Meta:
         model = MenuItem
         fields = (
             "id", "category", "name", "description", "price", "unit_name",
-            "is_available", "image_url", "archived", "created_at", "updated_at",
+            "is_available", "dish_kind", "image_url", "image", "archived", "created_at", "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_image(self, obj):
+        return media_url(obj.image)
 
     def validate_name(self, value):
         if self.instance and self.instance.is_archived:
@@ -67,6 +75,12 @@ class AvailabilitySerializer(serializers.Serializer):
 
 # ----- public (customers) -----
 class PublicItemSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField(help_text="The uploaded photo if there is one, else an older photo link, else null.")
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_image_url(self, obj):
+        return media_url(obj.image) or obj.image_url
+
     class Meta:
         model = MenuItem
         fields = ("id", "name", "description", "price", "unit_name", "is_available", "image_url")

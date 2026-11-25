@@ -2,13 +2,16 @@ from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import serializers
 from rest_framework.generics import GenericAPIView, ListCreateAPIView, RetrieveUpdateAPIView
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.services import record
 from apps.common.exceptions import Conflict
+from apps.common.images import ImageRejected, process_image
 from apps.common.schema import SLUG_PARAM, staff_schema
 from apps.restaurants.models import MembershipRole, Restaurant
 from apps.restaurants.permissions import RestaurantScopedMixin
@@ -118,6 +121,53 @@ class ItemDetailView(RestaurantScopedMixin, RetrieveUpdateAPIView):
                     )
         except IntegrityError:
             raise Conflict("That name is already in use.", code="duplicate_name") from None
+
+
+UPLOAD_BODY = {"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}, "required": ["file"]}}
+
+
+class ItemImageView(RestaurantScopedMixin, GenericAPIView):
+    """Upload (POST, multipart field "file") or remove (DELETE) an item's photo. JPEG, PNG or WebP up to 3 MB; it is checked,
+    resized and re-encoded as WebP before it is stored."""
+
+    min_role = MANAGER
+    queryset = MenuItem.objects.all()
+    serializer_class = ItemSerializer
+    parser_classes = [MultiPartParser]
+    http_method_names = ["post", "delete", "options"]
+
+    def _editable(self):
+        item = self.get_object()
+        if item.is_archived:
+            raise Conflict("Archived items cannot be edited.", code="item_archived")
+        return item
+
+    def _swap(self, item, new_content, action):
+        old = item.image.name if item.image else None
+        with transaction.atomic():
+            if new_content is None:
+                item.image = None
+            else:
+                item.image.save(new_content.name, new_content, save=False)
+            item.save(update_fields=["image", "updated_at"])
+            record(restaurant=self.request.restaurant, actor=self.request.user, action=action, entity_type="menu_item", entity_id=item.pk, metadata={"item": item.name})
+        if old:
+            item.image.storage.delete(old)  # after the commit, so a failed save never loses the old photo
+        return Response(self.get_serializer(item).data)
+
+    @extend_schema(parameters=[SLUG_PARAM], request=UPLOAD_BODY, responses=ItemSerializer, summary="Upload an item's photo (manager or owner)")
+    def post(self, request, *args, **kwargs):
+        item = self._editable()
+        try:
+            content = process_image(request.FILES.get("file"), "menu")
+        except ImageRejected as err:
+            raise serializers.ValidationError({"file": [err.message]}) from None
+        return self._swap(item, content, "menu_item.image_changed")
+
+    @extend_schema(parameters=[SLUG_PARAM], request=None, responses=ItemSerializer, summary="Remove an item's photo (manager or owner)")
+    def delete(self, request, *args, **kwargs):
+        item = self._editable()
+        return self._swap(item, None, "menu_item.image_removed") if item.image else Response(self.get_serializer(item).data)
 
 
 class ItemArchiveView(RestaurantScopedMixin, GenericAPIView):

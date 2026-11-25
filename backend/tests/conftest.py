@@ -49,7 +49,13 @@ def make_restaurant(db):
         kwargs.setdefault("slug", f"restaurant-{n}")
         kwargs.setdefault("currency", "USD")
         kwargs.setdefault("timezone", "UTC")
-        return Restaurant.objects.create(**kwargs)
+        with_account = kwargs.pop("with_account", True)  # customers pay first, so a restaurant needs somewhere to pay
+        restaurant = Restaurant.objects.create(**kwargs)
+        if with_account:
+            from apps.restaurants.models import PaymentAccount
+
+            PaymentAccount.objects.create(restaurant=restaurant, bank_name="Test Bank", account_name="Test Kitchen", account_number="0123456789")
+        return restaurant
 
     return _make
 
@@ -123,8 +129,13 @@ def place(api_client):
     from django.urls import reverse
 
     def _place(restaurant, items, key=None, phone="+442079460958", **extra):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
         body = {
             "customer_name": "Ada", "customer_phone": phone, "fulfilment_type": "PICKUP",
+            "pickup_at": (timezone.now() + timedelta(hours=2)).isoformat(),  # pickup needs a time, at least 30 minutes ahead
             "items": [{"menu_item_id": item_id, "quantity": quantity} for item_id, quantity in items], **extra,
         }
         return api_client.post(

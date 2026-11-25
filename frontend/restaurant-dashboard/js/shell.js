@@ -3,17 +3,24 @@
 import { ApiError, api } from "../../shared/js/api.js";
 import { getSession, logout } from "../../shared/js/auth.js";
 import { closeOnBackdrop, el, emptyState, icon, setBusy, toast } from "../../shared/js/ui.js";
+import { SUBSCRIPTION_ENDED_EVENT, subscriptionEndedBanner } from "../../shared/js/subscription.js";
 import { formDialog } from "./form-dialog.js";
+import { showPlanBanner } from "./plan-banner.js";
 import { ROLE_LABEL, displayName, hasRole, pickMembership } from "./session.js";
 
 const STORAGE_KEY = "serveflow.restaurant"; // the chosen restaurant slug only; never credentials
+// `primary` items are the bottom tabs on a phone; everything else sits behind "More". On a desktop all of them are in the sidebar.
 const NAV = [
-  { label: "Overview", href: "index.html", icon: "store", minRole: "STAFF" },
-  { label: "Orders", href: "orders.html", icon: "list", minRole: "STAFF" },
-  { label: "Menu", href: "menu.html", icon: "book", minRole: "STAFF" },
-  { label: "Settings", href: "settings.html", icon: "settings", minRole: "STAFF" },
+  { label: "Overview", href: "index.html", icon: "layout-dashboard", minRole: "STAFF", primary: true },
+  { label: "Orders", href: "orders.html", icon: "inbox", minRole: "STAFF", primary: true },
+  { label: "Menu", href: "menu.html", icon: "book", minRole: "STAFF", primary: true },
+  { label: "Reviews", href: "reviews.html", icon: "star", minRole: "STAFF" },
   { label: "Team", href: "team.html", icon: "users", minRole: "MANAGER" },
+  { label: "Billing", href: "billing.html", icon: "credit-card", minRole: "OWNER" },
+  { label: "Settings", href: "settings.html", icon: "settings", minRole: "STAFF" },
 ];
+
+const initials = (name) => String(name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "SF";
 
 const readStoredSlug = () => {
   try {
@@ -139,16 +146,35 @@ function buildAccountSheet(session, memberships, active) {
   return dialog;
 }
 
-function renderNav(nav, href, role, onAccount) {
+function renderNav(nav, href, role, onAccount, restaurant) {
+  const items = NAV.filter((item) => hasRole(role, item.minRole));
+  const more = items.filter((item) => !item.primary);
+
+  // Phones: a sheet with the less-used pages and the account. Desktops never see the button (CSS).
+  const sheet = el("dialog", { class: "dialog", "aria-label": "More" },
+    el("div", { class: "dialog__panel" },
+      el("nav", { class: "sheet-links", "aria-label": "More pages" },
+        ...more.map((item) => el("a", { class: "sheet-link", href: item.href, "aria-current": item.href === href ? "page" : null }, icon(item.icon), el("span", {}, item.label), icon("chevron-right"))),
+        el("button", { class: "sheet-link", type: "button", onclick: () => { sheet.close(); onAccount(); } }, icon("user"), el("span", {}, "Account"), icon("chevron-right")))));
+  closeOnBackdrop(sheet);
+  const moreCurrent = more.some((item) => item.href === href);
+  const moreButton = el("button", { class: "nav__item nav__more", type: "button", "aria-haspopup": "dialog", "aria-current": moreCurrent ? "page" : null, onclick: () => sheet.showModal() },
+    icon("menu"), "More");
+
   nav.replaceChildren(
     el("a", { class: "brand nav__brand", href: "index.html" },
-      el("span", { class: "brand__mark" }, icon("utensils")), "ServeFlow"),
-    ...NAV.filter((item) => hasRole(role, item.minRole)).map((item) =>
-      el("a", { class: "nav__item", href: item.href, "aria-current": item.href === href ? "page" : null },
+      el("span", { class: "brand__mark" }, icon("leaf")), "ServeFlow"),
+    restaurant ? el("div", { class: "nav__workspace" },
+      el("span", { class: "avatar" }, initials(restaurant.name)),
+      el("span", { class: "nav__workspace-text" }, el("strong", {}, restaurant.name), el("small", {}, String(role ?? "").toLowerCase()))) : null,
+    ...items.map((item) =>
+      el("a", { class: `nav__item${item.primary ? "" : " nav__item--secondary"}`, href: item.href, "aria-current": item.href === href ? "page" : null },
         icon(item.icon), item.label),
     ),
+    moreButton,
     el("span", { class: "nav__spacer" }),
-    el("button", { class: "nav__item", type: "button", onclick: onAccount }, icon("user"), "Account"),
+    el("button", { class: "nav__item nav__item--secondary", type: "button", onclick: onAccount }, icon("user"), "Account"),
+    sheet,
   );
 }
 
@@ -198,10 +224,14 @@ export async function bootDashboard({ href, minRole = "STAFF" }) {
   storeSlug(membership.restaurant.slug);
 
   const sheet = buildAccountSheet(session, memberships, membership);
-  renderNav(document.getElementById("nav"), href, membership.role, () => sheet.showModal());
+  renderNav(document.getElementById("nav"), href, membership.role, () => sheet.showModal(), membership.restaurant);
   document.getElementById("restaurant-name").textContent = membership.restaurant.name;
   document.getElementById("boot").hidden = true;
   document.getElementById("app").hidden = false;
+  if (href !== "billing.html") showPlanBanner(membership.restaurant.slug, membership.role);
+  window.addEventListener(SUBSCRIPTION_ENDED_EVENT, () => {
+    if (!document.getElementById("subscription-ended")) document.getElementById("main").prepend(subscriptionEndedBanner());
+  });
 
   return {
     session,

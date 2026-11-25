@@ -49,8 +49,14 @@ async function main() {
     submitLabel: "Create restaurant",
     validateForm: fulfilmentErrors,
     submit: (values) => api.post("/restaurants/", values),
-    onSuccess: (restaurant) => {
+    onSuccess: async (restaurant) => {
       setActiveRestaurant(restaurant.slug);
+      // The plan they picked on the pricing page: their trial already started on the cheapest plan; switch it to theirs.
+      try {
+        const picked = Number(sessionStorage.getItem("serveflow:plan"));
+        if (picked) await api.post(`/restaurants/${encodeURIComponent(restaurant.slug)}/billing/subscribe/`, { plan_id: picked });
+        sessionStorage.removeItem("serveflow:plan");
+      } catch { /* they can switch plan from Billing */ }
       location.replace("index.html");
     },
   });

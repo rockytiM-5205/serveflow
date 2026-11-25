@@ -92,8 +92,8 @@ quantities; any price, total or status it sends is ignored.
 
 | Method and path | Auth | Notes |
 |---|---|---|
-| `POST /restaurants/{slug}/orders/` | none; header `Idempotency-Key` required | `{customer_name, customer_phone, fulfilment_type: PICKUP\|DINE_IN, table_number?, notes?, items: [{menu_item_id, quantity}]}` (1-30 lines, quantity 1-99; repeated items are merged). 201 returns the order (see below) plus `token`. The key (16-64 letters, digits, `-`, `_`) is generated once per order attempt: a retry with the same key and body returns the original answer with `Idempotent-Replay: true`; the same key with a different body is 409 `idempotency_key_reused`. Limits: 10 per minute per IP, 20 per hour per phone per restaurant, 3 pending orders per phone per restaurant |
-| `GET /orders/{token}/` | the token | Customer view: `code, status, payment_status, fulfilment_type, table_number, currency, subtotal, total, restaurant{slug,name}, items[{name, unit_name, unit_price, quantity, line_total}], timeline[{status, at}], cancellable, created_at, updated_at`. **No name, phone or notes.** Sent with `Cache-Control: no-store`. Bad, forged and revoked tokens all return the same 404. 60 per minute per IP |
+| `POST /restaurants/{slug}/checkout/` | none; header `Idempotency-Key` required | `{customer_name, customer_phone, fulfilment_type: PICKUP\|DINE_IN, table_number?, notes?, items: [{menu_item_id, quantity}]}` (1-30 lines, quantity 1-99; repeated items are merged). 201 returns the order (see below) plus `token`. The key (16-64 letters, digits, `-`, `_`) is generated once per order attempt: a retry with the same key and body returns the original answer with `Idempotent-Replay: true`; the same key with a different body is 409 `idempotency_key_reused`. Limits: 30 per minute per IP, 20 per hour per phone per restaurant, 3 pending orders per phone per restaurant |
+| `GET /orders/{token}/` | the token | Customer view: `code, status, payment_status, fulfilment_type, table_number, currency, subtotal, total, restaurant{slug,name}, items[{name, unit_name, unit_price, quantity, line_total}], timeline[{status, at}], cancellable, created_at, updated_at`. **No name, phone or notes.** Sent with `Cache-Control: no-store`. Bad, forged and revoked tokens all return the same 404. 600 per minute per IP (pages poll every 5 seconds, and a dining room can share one IP) |
 | `POST /orders/{token}/cancel/` | the token | Only while `PENDING`; otherwise 409 `invalid_transition` |
 
 Order creation errors: 409 `not_accepting_orders`, `fulfilment_disabled`, `item_unavailable` (`details.items`: `[{id, name?, reason: "not_found"|"unavailable"}]`), `too_many_open_orders`; 400 `validation_error` (e.g. `table_number` when the restaurant requires it).
@@ -104,11 +104,36 @@ The token is `<order uuid, 32 hex><HMAC, 64 hex>`, signed with `SECRET_KEY` (old
 
 | Method and path | Role | Notes |
 |---|---|---|
-| `GET /restaurants/{slug}/orders/` | staff | Newest first, cursor-paginated. Filters: `status=PENDING,CONFIRMED`, `payment_status`, `fulfilment_type`, `business_date=YYYY-MM-DD`, `code=42`, `queue=1` (open orders plus served-but-unpaid). Rows have no phone number |
+| `GET /restaurants/{slug}/orders/` | staff | Newest first, cursor-paginated. Filters: `status=PENDING,CONFIRMED`, `payment_status`, `fulfilment_type`, `business_date=YYYY-MM-DD`, `code=42`, `queue=1` (open orders plus completed-but-unpaid). Rows have no phone number |
 | `GET /restaurants/{slug}/orders/{public_id}/` | staff | Adds `customer_phone`, `notes`, `subtotal`, full `events` and `payments` |
-| `POST .../orders/{public_id}/transitions/` | staff | `{to_status: CONFIRMED\|REJECTED\|SERVING\|SERVED, reason?, expected_status?}`. `REJECTED` needs a reason. A wrong step is 409 `invalid_transition`; a stale `expected_status` is 409 `stale_status` with `details.current_status` |
-| `POST .../orders/{public_id}/cancel/` | staff before `SERVING`; manager or owner during it | `{reason, acknowledge_serving?, expected_status?}`. Reason required. While `SERVING`: staff get 403 `manager_required`, managers must send `acknowledge_serving: true`, and the action is audited. `SERVED`, `REJECTED` and `CANCELLED` orders cannot be cancelled |
-| `POST .../orders/{public_id}/payment/` | staff | Header `Idempotency-Key` required. `{method: CASH\|TRANSFER, amount, reference?}`. Only for a `SERVED`, `UNPAID` order; `amount` must equal the total (400); one payment per order (409 `already_paid`, 409 `not_payable`). Audited |
+| `POST .../orders/{public_id}/transitions/` | staff | `{to_status: CONFIRMED\|REJECTED\|SERVING\|READY_FOR_PICKUP\|COMPLETED, reason?, expected_status?}`. `REJECTED` needs a reason. A wrong step is 409 `invalid_transition`; a stale `expected_status` is 409 `stale_status` with `details.current_status` |
+| `POST .../orders/{public_id}/cancel/` | staff before `SERVING`; manager or owner during `SERVING` and `READY_FOR_PICKUP` | `{reason, acknowledge_serving?, expected_status?}`. Reason required. While `SERVING` or `READY_FOR_PICKUP`: staff get 403 `manager_required`, managers must send `acknowledge_serving: true`, and the action is audited. `COMPLETED`, `REJECTED` and `CANCELLED` orders cannot be cancelled |
+| `POST .../orders/transitions/` | staff | `{orders: [public_id, ...], to_status: CONFIRMED\|SERVING\|READY_FOR_PICKUP\|COMPLETED}` (1 to 50). Moves each order forward, passing through the steps in between (a paid pending order goes through *accepted* to *preparing*). Returns `{moved: [public_id], skipped: [{public_id, reference, reason}]}`; `reason` is `payment_required`, `already_there`, `invalid_transition` or `not_found`. Skipped orders don't stop the others |
+| `POST .../orders/payments/confirm/` | staff | Header `Idempotency-Key` required. `{orders: [public_id, ...], method?: TRANSFER\|CASH, start_preparing?: bool}` (1 to 50 orders, default `TRANSFER`; `start_preparing` also accepts each order and starts preparing it). Confirms each order's payment for its full total, using the order's reference as the bank reference. Orders that can't be confirmed come back in `skipped` with a `reason` (`already_paid`, `not_payable`, `not_found`) and never stop the others. Returns `{confirmed: [public_id], skipped: [{public_id, reason}]}`. Audited per payment, plus one `payment.bulk_confirmed` entry |
+| `POST .../orders/{public_id}/payment/` | staff | Header `Idempotency-Key` required. `{method: CASH\|TRANSFER, amount, reference?}`. Only for a `COMPLETED`, `UNPAID` order; `amount` must equal the total (400); one payment per order (409 `already_paid`, 409 `not_payable`). Audited |
 
-Status flow: `PENDING -> CONFIRMED -> SERVING -> SERVED`; `PENDING -> REJECTED`; `PENDING/CONFIRMED/SERVING -> CANCELLED`.
-Payment is separate: `UNPAID -> PAID`, only after `SERVED`. Every change is recorded in the order's history with who did it.
+Status flow: `PENDING -> CONFIRMED -> SERVING (preparing) -> [READY_FOR_PICKUP] -> COMPLETED`; `PENDING -> REJECTED`; `PENDING/CONFIRMED/SERVING/READY_FOR_PICKUP -> CANCELLED`. `COMPLETED` is the billable step (see [billing.md](billing.md)). Orders carry a public `reference` such as `PRM-8K29P` (the restaurant's own `order_prefix`, locked once it has orders and shown with `order_prefix_locked` in settings; older orders keep a reference like `7K#M4@2P`) and a `source` (`MARKETPLACE` or `API`). A new order can be refused with 402 `ORDER_LIMIT_REACHED`.
+Payment is separate: `UNPAID -> PAID`, only after `COMPLETED`. Every change is recorded in the order's history with who did it.
+
+
+## Marketplace
+Public discovery routes (`/api/v1/marketplace/`), restaurant opening hours and the extended restaurant profile are described in [marketplace.md](marketplace.md).
+
+## Paying, pickup and references
+Customers pay before preparing; pickup orders carry a time and a fee; the public reference is random. See
+[orders-and-payments.md](orders-and-payments.md). New routes: `GET /restaurants/<slug>/pickup-slots/`,
+`POST /orders/<token>/paid/`, `GET/PUT /restaurants/<slug>/payment-account/`. New error codes: `payment_required`,
+`payment_details_missing`, `paid_order`.
+
+## Reviews
+See [reviews.md](reviews.md). Routes: `POST /orders/<token>/review/`, `GET /restaurants/<slug>/reviews/`,
+`GET /restaurants/<slug>/reviews/inbox/`, `POST /restaurants/<slug>/reviews/<id>/report/`. Error codes: `not_reviewable`,
+`already_reviewed`, `already_reviewed_restaurant`, `not_your_order`, `already_reported`. Reviewing needs a signed-in customer; see reviews.md.
+
+## Customer accounts and late pickup
+Accounts and order history: [customer-accounts.md](customer-accounts.md) (`/api/v1/customers/`). Late pickup policy and the new
+`accept_late_policy` field on checkout: [orders-and-payments.md](orders-and-payments.md).
+
+## Installable apps and order alerts
+
+See `docs/pwa-and-alerts.md`: `GET /restaurants/<slug>/manifest.webmanifest` (public) and `/restaurants/<slug>/push/config|subscribe|unsubscribe|test/` (staff).

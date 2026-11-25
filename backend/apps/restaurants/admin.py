@@ -20,7 +20,7 @@ class RestaurantAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     inlines = [MembershipInline]
     fieldsets = (
-        (None, {"fields": ("name", "slug", "description", "contact_phone", "address")}),
+        (None, {"fields": ("name", "slug", "order_prefix", "description", "contact_phone", "address")}),
         ("Status", {"fields": ("is_active", "accepting_orders")}),
         ("Regional", {"fields": ("currency", "timezone")}),
         ("Fulfilment", {"fields": ("pickup_enabled", "dine_in_enabled", "requires_table_number")}),

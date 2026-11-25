@@ -13,9 +13,25 @@ def order(order_in):
     return order_in()
 
 
-def test_an_order_cannot_be_paid_before_it_is_served(order):
-    with pytest.raises(IntegrityError), transaction.atomic():
-        Order.objects.filter(pk=order.pk).update(payment_status="PAID")
+def test_an_order_can_be_paid_before_it_is_completed(order):
+    Order.objects.filter(pk=order.pk).update(payment_status="PAID")  # customers pay first
+    assert Order.objects.get(pk=order.pk).payment_status == "PAID"
+
+
+def test_a_pickup_time_and_fee_only_exist_for_pickup_and_the_total_includes_the_fee(order):
+    from decimal import Decimal
+
+    from django.utils import timezone
+
+    for fields in (
+        {"fulfilment_type": "DINE_IN", "pickup_at": timezone.now()},   # a pickup time on a dine-in order
+        {"fulfilment_type": "DINE_IN", "pickup_fee": Decimal("1.00"), "total": Decimal("6.00")},
+        {"pickup_fee": Decimal("1.00")},                               # total no longer equals subtotal + fee
+        {"pickup_fee": Decimal("-1.00"), "total": Decimal("4.00")},
+    ):
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Order.objects.filter(pk=order.pk).update(**fields)
+    Order.objects.filter(pk=order.pk).update(pickup_fee=Decimal("1.00"), total=order.subtotal + Decimal("1.00"))  # consistent: fine
 
 
 def test_a_table_number_only_exists_for_dine_in(order):
@@ -76,7 +92,7 @@ def test_children_must_belong_to_the_orders_restaurant(order, make_restaurant, m
 
 
 def test_an_order_has_at_most_one_recorded_payment(order, make_user):
-    Order.objects.filter(pk=order.pk).update(status="SERVED")
+    Order.objects.filter(pk=order.pk).update(status="COMPLETED")
     user = make_user()
     Payment.objects.create(order=order, restaurant=order.restaurant, amount=5, currency="USD", method="CASH", recorded_by=user)
     with pytest.raises(IntegrityError), transaction.atomic():

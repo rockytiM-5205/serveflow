@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 CURRENCY_PATTERN = r"^[A-Z]{3}$"
+# The restaurant's own order-ID prefix: 3 to 5 capitals or digits, starting with a letter (PRM, KFC24).
+ORDER_PREFIX_PATTERN = r"^[A-Z][A-Z0-9]{2,4}$"
 
 # Slugs that would collide with platform URLs. Enforced here (friendly form errors)
 # and by a database CHECK constraint. Changing this tuple requires a migration.

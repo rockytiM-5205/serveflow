@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="same-origin">
+  <meta name="description" content="Find restaurants near you or by name, area and category, and order from your phone.">
+  <link rel="stylesheet" href="../shared/css/fonts.css">
+  <link rel="stylesheet" href="../shared/css/tokens.css">
+  <link rel="stylesheet" href="../shared/css/base.css">
+  <link rel="stylesheet" href="../shared/css/components.css">
+  <link rel="stylesheet" href="../shared/css/layout.css">
+  <link rel="stylesheet" href="css/customer.css">
+  <link rel="stylesheet" href="css/identity.css">
+  <link rel="stylesheet" href="css/marketplace.css">
+  <title>Find a restaurant · ServeFlow</title>
+  <script type="module" src="js/marketplace.js"></script>
+  <script src="../shared/js/load-guard.js" defer></script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../shared/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#064e3b">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar"><div class="container topbar__inner">
+    <a class="brand" href="marketplace.html"><span class="brand__mark"><svg class="icon" aria-hidden="true"><use href="../shared/assets/icons.svg#i-leaf"/></svg></span><span>ServeFlow</span></a>
+    <div id="site-nav"></div>
+  </div></header>
+  <main id="main" class="container customer-main stack">
+    <section class="market-head" aria-labelledby="market-title">
+      <h1 id="market-title">Find a restaurant</h1>
+      <p class="muted">Browse without an account. Sharing your location is optional: you can always search by name or area.</p>
+    </section>
+
+    <form id="search-form" class="card market-search" role="search" novalidate>
+      <div class="market-search__bar">
+        <div class="field market-search__main">
+          <label class="sr-only" for="q">Restaurant name</label>
+          <div class="input-icon">
+            <svg class="icon" aria-hidden="true"><use href="../shared/assets/icons.svg#i-search"/></svg>
+            <input class="input" id="q" type="search" maxlength="80" autocomplete="off" placeholder="Search restaurants by name">
+          </div>
+        </div>
+        <button class="btn btn--primary" type="submit">Search</button>
+      </div>
+      <div class="field">
+        <span class="sr-only" id="category-label">Category</span>
+        <div class="chips" id="categories" role="group" aria-labelledby="category-label"></div>
+      </div>
+      <details class="market-more" id="more-filters">
+        <summary><svg class="icon" aria-hidden="true"><use href="../shared/assets/icons.svg#i-filter"/></svg> More filters <svg class="icon market-more__chevron" aria-hidden="true"><use href="../shared/assets/icons.svg#i-chevron-down"/></svg></summary>
+        <div class="stack market-more__body">
+          <div class="market-row">
+            <div class="field">
+              <label class="label" for="area">Area or street</label>
+              <input class="input" id="area" type="text" maxlength="120" autocomplete="off" list="area-list" placeholder="e.g. your town or neighbourhood">
+              <datalist id="area-list"></datalist>
+            </div>
+            <div class="field">
+              <label class="label" for="sort">Sort by</label>
+              <select class="select" id="sort"></select>
+            </div>
+          </div>
+          <div class="market-row market-row--center">
+            <label class="check" for="open-now"><input type="checkbox" id="open-now"> Open now</label>
+            <div class="row" id="location-controls"></div>
+          </div>
+          <p class="hint" id="location-note" role="status" hidden></p>
+          <div class="row"><button class="btn btn--ghost btn--sm" type="button" id="reset">Clear filters</button></div>
+        </div>
+      </details>
+    </form>
+
+    <section aria-labelledby="results-title" class="stack">
+      <h2 id="results-title" class="market-count" aria-live="polite">Restaurants</h2>
+      <div id="results" class="rest-grid"></div>
+      <div class="row row--center"><button class="btn btn--secondary" type="button" id="more" hidden>Show more</button></div>
+    </section>
+    <noscript>This page needs JavaScript.</noscript>
+  </main>
+  <footer class="footer">Powered by ServeFlow</footer>
+</body>
+</html>

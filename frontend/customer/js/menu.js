@@ -1,11 +1,26 @@
 import { ApiError, api } from "../../shared/js/api.js";
 import { closeOnBackdrop, el, emptyState, formatMoney, icon, toast } from "../../shared/js/ui.js";
-import { isHttpsUrl } from "../../shared/js/validators.js";
-import { createCart, describeCart, fromCents, loadLastOrder } from "./cart.js";
+import { isSubscriptionEnded, orderingPausedState } from "../../shared/js/subscription.js";
+import { robustImage } from "../../shared/js/images.js";
+import { isImageSource } from "../../shared/js/validators.js";
+import { startLive } from "../../shared/js/live.js";
+import { createCart, describeCart, fromCents } from "./cart.js";
 import { bootCustomer, show, skeleton } from "./restaurant.js";
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const MAX_QUANTITY = 99;
+
+// Elements a render adds to <body>. They are removed before the next render, so a refresh never duplicates them.
+let mounted = [];
+const mount = (...nodes) => {
+  document.body.append(...nodes);
+  mounted.push(...nodes);
+};
+function unmount() {
+  mounted.forEach((node) => node.remove());
+  mounted = [];
+  document.body.classList.remove("has-cart-bar");
+}
 
 function placeholder() {
   return el("div", { class: "media-placeholder", "aria-hidden": "true" }, icon("image", { large: true }));
@@ -13,10 +28,8 @@ function placeholder() {
 
 function thumbnail(item) {
   const box = el("div", { class: "thumb" });
-  if (isHttpsUrl(item.image_url)) {
-    const img = el("img", { src: item.image_url, alt: "", loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" });
-    img.addEventListener("error", () => img.replaceWith(placeholder()), { once: true });
-    box.append(img);
+  if (isImageSource(item.image_url)) {
+    box.append(robustImage({ src: item.image_url, attrs: { loading: "lazy", referrerpolicy: "no-referrer" }, fallback: placeholder }));
   } else {
     box.append(placeholder());
   }
@@ -37,17 +50,27 @@ function main() {
   return bootCustomer().then(async (ctx) => {
     if (!ctx) return;
     const { slug, restaurant } = ctx;
-    document.getElementById("back-link").href = `index.html?r=${encodeURIComponent(slug)}`;
-    const lastOrder = loadLastOrder(slug);
-    if (lastOrder) {
-      const track = document.getElementById("track-link");
-      track.href = `order.html?r=${encodeURIComponent(slug)}#${lastOrder}`;
-      track.hidden = false;
-    }
     show(el("div", { class: "menu-grid" }, ...Array.from({ length: 6 }, () => skeleton())));
     try {
-      render(await api.get(`/restaurants/${encodeURIComponent(slug)}/menu/`), slug, restaurant);
+      const menuUrl = `/restaurants/${encodeURIComponent(slug)}/menu/`;
+      const menu = await api.get(menuUrl);
+      render(menu, slug, restaurant);
+      // Live: pick up sold-out items, price changes and the restaurant opening or closing for orders.
+      let last = JSON.stringify([restaurant, menu]);
+      startLive({
+        intervalMs: 10000,
+        refresh: async () => {
+          const [info, fresh] = await Promise.all([api.get(`/restaurants/${encodeURIComponent(slug)}/`), api.get(menuUrl)]);
+          const json = JSON.stringify([info, fresh]);
+          if (json === last) return;
+          last = json;
+          const y = window.scrollY;
+          render(fresh, slug, info);
+          window.scrollTo(0, y);
+        },
+      });
     } catch (err) {
+      if (isSubscriptionEnded(err)) return show(orderingPausedState());
       show(emptyState({
         iconName: "alert", title: "Couldn't load the menu", text: err instanceof ApiError ? err.message : "Something went wrong.",
         action: el("button", { class: "btn btn--secondary", type: "button", onclick: () => location.reload() }, icon("refresh"), "Try again"),
@@ -57,6 +80,7 @@ function main() {
 }
 
 function render(menu, slug, restaurant) {
+  unmount();
   const { categories } = menu;
   const currency = menu.restaurant.currency;
   const chipNav = document.getElementById("chips");
@@ -72,6 +96,7 @@ function render(menu, slug, restaurant) {
 
   const itemsById = new Map(categories.flatMap((c) => c.items).map((item) => [item.id, item]));
   const ordering = restaurant.accepting_orders;
+  document.getElementById("cart-button").hidden = !ordering;
   const cart = createCart(slug);
   if (ordering) {
     const removed = cart.reconcile(itemsById);
@@ -114,10 +139,8 @@ function render(menu, slug, restaurant) {
 
   function foodCard(item) {
     const media = el("div", { class: "food-card__media" });
-    if (isHttpsUrl(item.image_url)) {
-      const img = el("img", { src: item.image_url, alt: item.name, loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" });
-      img.addEventListener("error", () => img.replaceWith(placeholder()), { once: true });
-      media.append(img);
+    if (isImageSource(item.image_url)) {
+      media.append(robustImage({ src: item.image_url, alt: item.name, attrs: { loading: "lazy", referrerpolicy: "no-referrer" }, fallback: placeholder }));
     } else {
       media.append(placeholder());
     }
@@ -127,7 +150,7 @@ function render(menu, slug, restaurant) {
       el("div", { class: "food-card__body" },
         el("h3", { class: "food-card__name" }, item.name),
         item.description ? el("p", { class: "food-card__desc" }, item.description) : null,
-        el("p", { class: "price" }, formatMoney(item.price, currency), " ", el("span", { class: "price__unit" }, `/ ${item.unit_name}`)),
+        el("p", { class: "price" }, formatMoney(item.price, currency), ...(item.unit_name ? [" ", el("span", { class: "price__unit" }, `/ ${item.unit_name}`)] : [])),
       ),
     );
     if (ordering) {
@@ -175,12 +198,13 @@ function render(menu, slug, restaurant) {
   const notice = ordering ? null : el("div", { class: "alert alert--warning", role: "note" }, icon("clock"),
     el("span", {}, "This restaurant isn't taking orders right now. You can still look at the menu."));
   show(el("div", { class: "stack" }, notice, ...sections));
-  document.body.append(categorySheet, fab);
+  mount(categorySheet, fab);
 
   const observer = new IntersectionObserver((entries) => {
     for (const entry of entries) if (entry.isIntersecting) setCurrent(entry.target.dataset.id);
   }, { rootMargin: "-25% 0px -65% 0px" });
   sections.forEach((section) => observer.observe(section));
+  mounted.push({ remove: () => observer.disconnect() });
 
   if (ordering) mountCart(cart, itemsById, currency, slug, cardRefreshers);
 }
@@ -204,8 +228,8 @@ function mountCart(cart, itemsById, currency, slug, cardRefreshers) {
         el("button", { class: "btn btn--ghost btn--sm", type: "button", "aria-label": "Close", onclick: () => sheet.close() }, icon("x"))),
       sheetBody));
   closeOnBackdrop(sheet);
-  document.body.append(bar, sheet);
-  headerButton.addEventListener("click", () => openSheet());
+  mount(bar, sheet);
+  headerButton.onclick = () => openSheet();
 
   function openSheet() {
     renderSheet();
@@ -225,7 +249,7 @@ function mountCart(cart, itemsById, currency, slug, cardRefreshers) {
           thumbnail(item),
           el("div", { class: "cart-line__main" },
             el("p", { class: "cart-line__name" }, item.name),
-            el("p", { class: "muted price-sub" }, `${formatMoney(item.price, currency)} / ${item.unit_name}`),
+            el("p", { class: "muted price-sub" }, `${formatMoney(item.price, currency)}${item.unit_name ? ` / ${item.unit_name}` : ""}`),
             stepper({ name: item.name, quantity, onChange: (delta) => { cart.change(id, delta); renderSheet({ id, role: delta > 0 ? "plus" : "minus" }); } })),
           el("div", { class: "cart-line__side" },
             el("p", { class: "price" }, formatMoney(fromCents(lineCents), currency)),

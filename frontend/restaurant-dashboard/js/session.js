@@ -2,7 +2,7 @@
  * the backend re-checks every request. */
 export const ROLE_RANK = { STAFF: 1, MANAGER: 2, OWNER: 3 };
 export const ROLE_LABEL = { OWNER: "Owner", MANAGER: "Manager", STAFF: "Staff" };
-export const PAGES = ["index.html", "orders.html", "menu.html", "settings.html", "team.html", "create-restaurant.html"];
+export const PAGES = ["index.html", "orders.html", "menu.html", "reviews.html", "settings.html", "team.html", "create-restaurant.html"];
 
 export function hasRole(role, minRole) {
   const have = Object.hasOwn(ROLE_RANK, role) ? ROLE_RANK[role] : 0;

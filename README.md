@@ -114,7 +114,9 @@ pytest
    `0003`), then `makemigrations orders`, then **copy** `docs/migrations/orders_0002_composite_fks.py` to
    `backend/apps/orders/migrations/0002_composite_fks.py` (drop the `orders_` prefix). It adds the same-restaurant foreign
    keys Django cannot generate. A test fails if the copy step is skipped. Then `migrate`.
-6. Optionally schedule `python manage.py purge_idempotency` (daily) to delete stored retry answers older than 48 hours.
+6. `makemigrations platform_admin` (plans, subscriptions, credentials, usage, platform audit; it depends on `accounts` and
+   `restaurants`), review, then `migrate`. Schedule `python manage.py sync_subscriptions` daily. See `docs/owner-api-contract.md`.
+7. Optionally schedule `python manage.py purge_idempotency` (daily) to delete stored retry answers older than 48 hours.
 
 ## Layout
 
@@ -144,6 +146,10 @@ module. If unset it defaults to `production`, the strictest.
 restart `runserver`, and open the failing URL directly, e.g. `http://localhost:8000/api/v1/restaurants/<slug>/`.
 Typical causes: a migration not applied (`python manage.py showmigrations` lists unapplied ones with `[ ]`), or a
 migration file missing. Turn `DJANGO_DEBUG` back off afterwards.
+
+**The dashboard Orders page says "GET not allowed".** An older build had two routes on one address. Make sure you are on a
+version where customers place orders at `/api/v1/restaurants/<slug>/checkout/` and staff list orders at `.../orders/`
+(`backend/tests/test_urls.py` fails if two API routes ever share an address).
 
 **"No restaurant access" after signing in.** The account has no restaurant yet. With `DJANGO_SELF_SERVICE=True` the
 dashboard offers "Create your restaurant"; otherwise an owner must add you under Team.

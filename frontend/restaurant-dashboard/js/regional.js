@@ -21,9 +21,16 @@ export function timezoneOptions(selected) {
 }
 
 /** Fields shared by "create restaurant" and "edit details". */
-export function restaurantFields({ includeSlug = false, timezone } = {}) {
+export function restaurantFields({ includeSlug = false, includePrefix = false, timezone } = {}) {
   const fields = [{ name: "name", label: "Restaurant name", type: "text", required: true, maxlength: 120, autocomplete: "organization" }];
   if (includeSlug) fields.push({ name: "slug", label: "Web address", type: "text", required: true, maxlength: 63, hint: "" });
+  if (includePrefix) {
+    fields.push({
+      name: "order_prefix", label: "Order ID prefix", type: "text", required: true, maxlength: 5,
+      hint: "3 to 5 letters or digits, starting with a letter. Orders look like PRM-8K29P. It locks after your first order.",
+      validate: (v) => (/^[A-Za-z][A-Za-z0-9]{2,4}$/.test(v) ? null : "Use 3 to 5 letters or digits, starting with a letter."),
+    });
+  }
   fields.push(
     { name: "description", label: "About (optional)", type: "textarea", maxlength: 1000 },
     { name: "address", label: "Address (optional)", type: "text", maxlength: 255, autocomplete: "street-address" },

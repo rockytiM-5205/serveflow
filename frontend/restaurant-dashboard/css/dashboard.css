@@ -50,11 +50,15 @@ button.nav__item { background: transparent; border: 0; font-family: inherit; cur
 .order-card[data-status="PENDING"] { border-left-color: #d97706; }
 .order-card[data-status="CONFIRMED"] { border-left-color: #2563eb; }
 .order-card[data-status="SERVING"] { border-left-color: #7c3aed; }
-.order-card[data-status="SERVED"] { border-left-color: var(--accent); }
+.order-card[data-status="READY_FOR_PICKUP"] { border-left-color: #d97706; }
+.order-card[data-status="COMPLETED"] { border-left-color: var(--accent); }
 .order-card[data-new="true"] { animation: new-order 2.4s var(--ease); }
 @keyframes new-order { from { box-shadow: 0 0 0 4px var(--accent-soft); } }
 .order-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
 .order-card__code { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.order-card__select { width: 1.5rem; height: 1.5rem; accent-color: var(--brand, currentColor); }
+.selection-bar { flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+.selection-bar[data-active="true"] { position: sticky; bottom: calc(var(--s-2) + env(safe-area-inset-bottom)); z-index: 15; padding: var(--s-3); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-md, 0.75rem); box-shadow: var(--shadow-2); }
 .order-card__time { margin-left: auto; font-size: var(--fs-sm); }
 .order-card__meta { color: var(--ink-2); overflow-wrap: anywhere; }
 .order-card__items { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s-1); }
@@ -65,3 +69,33 @@ button.nav__item { background: transparent; border: 0; font-family: inherit; cur
 .total-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); padding-top: var(--s-3); border-top: 1px solid var(--line); font-size: var(--fs-lg); }
 .history { margin: 0; padding-left: var(--s-5); display: grid; gap: var(--s-2); font-size: var(--fs-sm); }
 .history__reason { overflow-wrap: anywhere; }
+
+.page-head { position: relative; }
+.page-head .live { position: absolute; top: 0; right: 0; }
+.sound-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.pictures-grid { display: grid; gap: var(--s-5); grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); align-items: start; }
+
+/* usage meter on the billing page */
+.meter { height: 0.625rem; border-radius: var(--r-pill); background: var(--surface-sunken); overflow: hidden; }
+.meter > span { display: block; height: 100%; background: var(--accent); }
+
+/* reviews */
+.stars { color: #d97706; letter-spacing: 0.1em; white-space: nowrap; }
+.review__head { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); align-items: center; }
+.review-card p { margin: 0; overflow-wrap: anywhere; }
+.row--center { justify-content: center; }
+.badge[data-status="CLOSED"] { --badge-bg: #e7e5e4; --badge-fg: #44403c; }
+.badge[data-status="PAUSED"] { --badge-bg: #fef3c7; --badge-fg: #92400e; }
+
+/* ---- Workspace pieces shared with the premium theme ---- */
+.avatar { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: var(--r-md); background: var(--accent); color: #fff; font-size: var(--fs-xs); font-weight: 700; }
+.nav__workspace-text { min-width: 0; display: grid; line-height: 1.25; }
+.nav__workspace-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.nav__workspace-text small { color: var(--ink-3); font-size: var(--fs-xs); text-transform: capitalize; }
+.sheet-links { display: grid; gap: 2px; }
+.sheet-link { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: 3rem; padding: 0 var(--s-3); border: 0; border-radius: var(--r-md); background: none; color: var(--ink); font: inherit; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer; }
+.sheet-link span { flex: 1; }
+.sheet-link:hover, .sheet-link[aria-current="page"] { background: var(--surface-sunken); }
+.search-row { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+.search-row .input { flex: 1; min-width: 0; }

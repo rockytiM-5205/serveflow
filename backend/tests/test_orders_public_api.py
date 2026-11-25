@@ -6,6 +6,15 @@ from apps.orders.models import Order, OrderStatusEvent
 
 pytestmark = pytest.mark.django_db
 
+def _later():
+    """A pickup time that is allowed: two hours from now."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    return (timezone.now() + timedelta(hours=2)).isoformat()
+
+
 KEY = "k" * 20
 
 
@@ -21,12 +30,12 @@ def lookup(client, token):
 def test_the_server_prices_the_order_and_ignores_client_values(place, shop):
     response = place(
         shop.restaurant, [(shop.rice.pk, 3), (shop.beans.pk, 2)],
-        price="0.01", total="0.01", subtotal="0.01", status="SERVED", payment_status="PAID",
+        price="0.01", total="0.01", subtotal="0.01", status="COMPLETED", payment_status="PAID",
     )
     assert response.status_code == 201
     body = response.json()
     assert (body["subtotal"], body["total"], body["currency"]) == ("10.00", "10.00", "USD")
-    assert (body["status"], body["payment_status"], body["code"]) == ("PENDING", "UNPAID", "001")
+    assert (body["status"], body["payment_status"]) == ("PENDING", "UNPAID") and "code" not in body  # customers get a reference, not the staff number
     assert len(body["token"]) == 96
     assert body["cancellable"] is True
     assert [(i["name"], i["quantity"], i["unit_price"], i["line_total"]) for i in body["items"]] == [
@@ -77,7 +86,7 @@ def test_merged_quantity_is_capped(place, shop):
 )
 def test_order_input_is_validated(api_client, shop, override):
     body = {
-        "customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP",
+        "customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP", "pickup_at": _later(),
         "items": [{"menu_item_id": shop.rice.pk, "quantity": 1}], **override,
     }
     response = api_client.post(
@@ -159,11 +168,10 @@ def test_unknown_and_suspended_restaurants_are_404(api_client, place, shop):
 def test_order_codes_restart_per_restaurant(place, shop, make_restaurant, make_category, make_item):
     other = make_restaurant(accepting_orders=True)
     other_item = make_item(make_category(other))
-    codes = [
-        place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460001").json()["code"],
-        place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460002").json()["code"],
-        place(other, [(other_item.pk, 1)]).json()["code"],
-    ]
+    place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460001")
+    place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460002")
+    place(other, [(other_item.pk, 1)])
+    codes = [o.code for o in Order.objects.order_by("id")]  # the staff-facing number, never shown to customers
     assert codes == ["001", "002", "001"]
 
 
@@ -175,7 +183,7 @@ def test_a_phone_number_cannot_pile_up_pending_orders(place, shop):
 
 
 def test_order_creation_is_rate_limited(place, shop):
-    for _ in range(10):
+    for _ in range(30):
         place(shop.restaurant, [])
     assert place(shop.restaurant, []).status_code == 429
 
@@ -183,7 +191,7 @@ def test_order_creation_is_rate_limited(place, shop):
 # ---------------------------------------------------------------- idempotency
 def test_the_idempotency_key_is_required(api_client, shop):
     url = reverse("public-order-create", kwargs={"slug": shop.restaurant.slug})
-    body = {"customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP",
+    body = {"customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP", "pickup_at": _later(),
             "items": [{"menu_item_id": shop.rice.pk, "quantity": 1}]}
     assert code(api_client.post(url, body, format="json")) == "idempotency_key_required"
     assert api_client.post(url, body, format="json", HTTP_IDEMPOTENCY_KEY="short").status_code == 400
@@ -228,8 +236,8 @@ def test_lookup_shows_status_but_not_who_ordered(place, shop, api_client):
     assert response.headers["Cache-Control"] == "no-store" and response.headers["Referrer-Policy"] == "no-referrer"
     body = response.json()
     assert set(body) == {
-        "code", "status", "payment_status", "fulfilment_type", "table_number", "currency", "subtotal", "total",
-        "restaurant", "items", "timeline", "cancellable", "created_at", "updated_at",
+        "reference", "status", "payment_status", "payment", "review", "can_review", "pickup_policy", "late_fee", "fulfilment_type", "table_number", "pickup_at", "pickup_fee", "currency",
+        "subtotal", "total", "restaurant", "items", "timeline", "cancellable", "created_at", "updated_at",
     }
     assert body["restaurant"] == {"slug": shop.restaurant.slug, "name": shop.restaurant.name}
     assert "Ada" not in str(body) and "442079460958" not in str(body) and "No salt" not in str(body)
@@ -254,12 +262,12 @@ def test_raising_token_version_revokes_the_link(place, shop, api_client):
 def test_a_token_only_opens_its_own_order(place, shop, api_client):
     first = place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460001").json()
     second = place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079460002").json()
-    assert lookup(api_client, first["token"]).json()["code"] == "001"
-    assert lookup(api_client, second["token"]).json()["code"] == "002"
+    assert lookup(api_client, first["token"]).json()["reference"] == first["reference"]
+    assert lookup(api_client, second["token"]).json()["reference"] == second["reference"] != first["reference"]
 
 
 def test_lookup_is_rate_limited(api_client):
-    for _ in range(60):
+    for _ in range(600):
         lookup(api_client, "0" * 96)
     assert lookup(api_client, "0" * 96).status_code == 429
 

@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getSession, login } from "../shared/js/auth.js";
-import { ApiError, api, request } from "../shared/js/api.js";
+import { ApiError, api, request, retryPolicy } from "../shared/js/api.js";
+
+retryPolicy.delaysMs = [0, 0]; // no waiting in tests
 import { displayName, hasRole, pickMembership, safeNext } from "../restaurant-dashboard/js/session.js";
 
 const json = (body, init = {}) =>
@@ -92,6 +94,34 @@ test("getSession: null on 401, data on 200, throws otherwise", async () => {
   assert.equal((await getSession()).user.email, "a@b.co");
   setup(() => json({ error: { code: "error", message: "x" } }, { status: 500 }));
   await assert.rejects(getSession(), (err) => err.status === 500);
+});
+
+test("a read that fails to connect is tried again quietly, and the person never sees the blip", async () => {
+  let n = 0;
+  const calls = setup(() => (++n < 3 ? Promise.reject(new TypeError("fetch failed")) : json({ ok: true })));
+  assert.deepEqual(await api.get("/x/"), { ok: true });
+  assert.equal(calls.length, 3);
+});
+
+test("a read gives up after its retries and then shows the usual error", async () => {
+  const calls = setup(() => Promise.reject(new TypeError("fetch failed")));
+  await assert.rejects(api.get("/x/"), (err) => err.code === "network_error");
+  assert.equal(calls.length, 3); // the first try plus two retries
+});
+
+test("a 502 from a restarting server is retried, but a 404 or 400 is not", async () => {
+  let n = 0;
+  setup(() => (++n < 2 ? json({ error: { code: "backend_unreachable", message: "x" } }, { status: 502 }) : json({ ok: true })));
+  assert.deepEqual(await api.get("/x/"), { ok: true });
+  const calls = setup(() => json({ error: { code: "not_found", message: "no" } }, { status: 404 }));
+  await assert.rejects(api.get("/x/"), (err) => err.status === 404);
+  assert.equal(calls.length, 1);
+});
+
+test("a write is never repeated behind the person's back", async () => {
+  const calls = setup(() => Promise.reject(new TypeError("fetch failed")));
+  await assert.rejects(api.post("/orders/", { a: 1 }), (err) => err.code === "network_error");
+  assert.equal(calls.length, 1);
 });
 
 test("login fetches the CSRF cookie first, then posts credentials", async () => {

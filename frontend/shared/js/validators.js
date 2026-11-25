@@ -9,6 +9,11 @@ export function isValidSortOrder(value) {
   return Number.isInteger(value) && value >= 0 && value <= 32767;
 }
 
+/** A picture the page may show: an uploaded one (a path under /media/) or an older https link. */
+export function isImageSource(text) {
+  return typeof text === "string" && (/^\/media\/[\w./-]+$/.test(text) && !text.includes("..") || isHttpsUrl(text));
+}
+
 export function isHttpsUrl(text) {
   if (typeof text !== "string") return false;
   try {

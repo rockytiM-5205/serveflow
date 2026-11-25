@@ -1,0 +1,14 @@
+/* Plan cards and payment steps, shared by the public pricing page and the dashboard Billing page. */
+.plan-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.plan { display: grid; gap: var(--s-3); align-content: start; padding: var(--s-5); }
+.plan--current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plan__price { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; }
+.plan__price small { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-3); }
+.plan__facts, .plan__features { margin: 0; padding-left: var(--s-5); display: grid; gap: var(--s-1); }
+.plan__features { color: var(--ink-2); }
+.steps { margin: 0; padding-left: var(--s-5); display: grid; gap: var(--s-2); }
+.pay-box { display: grid; gap: var(--s-2); padding: var(--s-5); }
+.pay-box dl { display: grid; grid-template-columns: 1fr; gap: 2px var(--s-4); margin: 0; }
+.pay-box dt { color: var(--ink-3); font-size: var(--fs-sm); } .pay-box dd { margin: 0 0 var(--s-2); font-weight: 600; overflow-wrap: anywhere; }
+@media (min-width: 480px) { .pay-box dl { grid-template-columns: 10rem 1fr; } .pay-box dd { margin: 0; } }
+.pricing-page { max-width: 64rem; margin: 0 auto; padding: var(--s-6) var(--s-4) var(--s-12); display: grid; gap: var(--s-6); }

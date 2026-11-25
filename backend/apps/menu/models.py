@@ -34,6 +34,27 @@ class MenuCategory(models.Model):
         return self.name
 
 
+def item_image_path(instance, filename):
+    return f"restaurants/{instance.restaurant_id}/menu/{filename}"
+
+
+class DishKind(models.TextChoices):
+    """What is drawn for an item on the customer's order plate when it has no photo."""
+
+    RICE = "rice", "Rice or pasta"
+    MEAT = "meat", "Meat or chicken"
+    FISH = "fish", "Fish or seafood"
+    PLANTAIN = "plantain", "Plantain, yam or chips"
+    SWALLOW = "swallow", "Swallow (pounded yam, amala, eba)"
+    SOUP = "soup", "Soup or stew"
+    DRINK = "drink", "Drink"
+    DESSERT = "dessert", "Dessert"
+    EGG = "egg", "Eggs"
+    VEG = "veg", "Salad or vegetables"
+    BREAD = "bread", "Bread, snack or pastry"
+    DISH = "dish", "Something else"
+
+
 class MenuItem(models.Model):
     restaurant = models.ForeignKey(Restaurant, on_delete=models.PROTECT, related_name="menu_items")
     category = models.ForeignKey(MenuCategory, on_delete=models.PROTECT, related_name="items")
@@ -42,12 +63,20 @@ class MenuItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     unit_name = models.CharField(max_length=32, default="portion", help_text="What one unit is, e.g. spoon, piece, portion.")
     is_available = models.BooleanField(default=True)
+    dish_kind = models.CharField(
+        max_length=16, blank=True, default="", choices=DishKind.choices,
+        help_text="What is drawn for this item on the customer's order plate when it has no photo. Empty: chosen automatically from its name and category.",
+    )
     image_url = models.URLField(
         max_length=500,
         null=True,
         blank=True,
         validators=[URLValidator(schemes=["https"])],
-        help_text="HTTPS link to a photo of this item. Leave empty to show a placeholder.",
+        help_text="Older items may have a link to a photo. New photos are uploaded instead (see image).",
+    )
+    image = models.ImageField(
+        upload_to=item_image_path, max_length=200, null=True, blank=True,
+        help_text="A photo uploaded from the dashboard (checked and re-encoded as WebP). It is shown instead of image_url.",
     )
     archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

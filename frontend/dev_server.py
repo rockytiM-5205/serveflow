@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Development server: serves frontend/ and proxies /api/, /admin/ and /static/ to Django.
+"""Development server: serves frontend/ and proxies /api/, /admin/, /static/ and /media/ (uploaded pictures) to Django.
 
 Everything shares one origin (http://localhost:5173), so session cookies and CSRF work
 without CORS. The proxy forwards the original Host header so Django's CSRF origin check
 matches. Binds to 127.0.0.1 only. For development, not production.
 
-    python frontend/dev_server.py [--port 5173] [--backend http://127.0.0.1:8000]
+    python frontend/dev_server.py [--port 5173] [--backend http://127.0.0.1:8000] [--host 127.0.0.1]
+
+--host 0.0.0.0 lets a phone on the same Wi-Fi reach it at http://<this computer's address>:5173. A phone only treats a site as
+installable (and allows order alerts) over HTTPS or as localhost, so for installing use a tunnel or USB: see docs/phone-testing.md.
 """
 import argparse
 import http.client
@@ -15,11 +18,12 @@ import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-PROXIED_PREFIXES = ("/api/", "/admin/", "/static/")
+PROXIED_PREFIXES = ("/api/", "/admin/", "/static/", "/media/")
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade"}
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".webmanifest": "application/manifest+json", ".js": "text/javascript"}
     backend_host = "127.0.0.1"
     backend_port = 8000
 
@@ -84,13 +88,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=5173)
+    parser.add_argument("--host", default="127.0.0.1", help="address to listen on; 0.0.0.0 lets other devices on your Wi-Fi in")
     parser.add_argument("--backend", default="http://127.0.0.1:8000")
     args = parser.parse_args()
     target = urllib.parse.urlsplit(args.backend)
     Handler.backend_host = target.hostname or "127.0.0.1"
     Handler.backend_port = target.port or 80
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = http.server.ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Frontend: http://localhost:{args.port}/  ->  proxying /api/ to {args.backend}")
+    if args.host not in ("127.0.0.1", "localhost"):
+        print(f"Listening on {args.host}: anyone on your network can open this. For development only.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

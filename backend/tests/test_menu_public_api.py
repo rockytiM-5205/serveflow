@@ -21,8 +21,9 @@ def test_public_restaurant_details(api_client, make_restaurant):
     assert body["accepting_orders"] is False
     assert body["dine_in_enabled"] is True and body["requires_table_number"] is True
     assert set(body) == {
-        "slug", "name", "description", "contact_phone", "address", "currency", "timezone",
-        "accepting_orders", "pickup_enabled", "dine_in_enabled", "requires_table_number",
+        "slug", "name", "description", "contact_phone", "address", "area", "category", "latitude", "longitude",
+        "currency", "timezone", "accepting_orders", "availability", "is_open_now", "hours", "rating_average", "rating_count",
+        "pickup_enabled", "pickup_fee", "pickup_min_minutes", "late_policy", "dine_in_enabled", "requires_table_number", "logo_url", "cover_url",
     }
 
 

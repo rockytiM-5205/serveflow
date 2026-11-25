@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ServeFlow design system (development)</title>
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -12,6 +13,10 @@
   <style>
     .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: var(--s-3); }
     .swatch { display: grid; gap: var(--s-2); font-size: var(--fs-sm); }
+    .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: var(--s-2); }
+    .icon-cell { display: grid; justify-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-1); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--ink-2); font-size: var(--fs-xs); }
+    .icon-cell .icon { width: 1.5rem; height: 1.5rem; color: var(--brand-900); }
+    .swatch code { color: var(--ink-3); font-size: var(--fs-xs); }
     .swatch__chip { height: 3rem; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--swatch); }
   </style>
 </head>
@@ -20,7 +25,7 @@
 
   <header class="topbar">
     <div class="container topbar__inner">
-      <a class="brand" href="design-system.html"><span class="brand__mark"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#i-utensils"/></svg></span>ServeFlow</a>
+      <a class="brand" href="design-system.html"><span class="brand__mark"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#i-leaf"/></svg></span>ServeFlow</a>
       <button class="btn btn--ghost cart-button" type="button" aria-label="Order, 2 items">
         <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#i-bag"/></svg>
         <span class="cart-button__count num">2</span>
@@ -48,23 +53,41 @@
 
     <section class="stack" aria-labelledby="h-colour">
       <h2 id="h-colour">Colour</h2>
+      <p class="muted">One brand colour for actions; everything else is neutral. Semantic colours appear only in status indicators and alerts.</p>
       <div class="swatches">
-        <div class="swatch" style="--swatch: var(--bg)"><div class="swatch__chip"></div>Background</div>
-        <div class="swatch" style="--swatch: var(--surface)"><div class="swatch__chip"></div>Surface</div>
-        <div class="swatch" style="--swatch: var(--ink)"><div class="swatch__chip"></div>Ink</div>
-        <div class="swatch" style="--swatch: var(--accent)"><div class="swatch__chip"></div>Accent</div>
-        <div class="swatch" style="--swatch: var(--accent-soft)"><div class="swatch__chip"></div>Accent soft</div>
+        <div class="swatch" style="--swatch: var(--brand-900)"><div class="swatch__chip"></div>Primary <code>#064E3B</code></div>
+        <div class="swatch" style="--swatch: var(--brand-950)"><div class="swatch__chip"></div>Dark <code>#022C22</code></div>
+        <div class="swatch" style="--swatch: var(--brand-300)"><div class="swatch__chip"></div>Mint <code>#86EFAC</code></div>
+        <div class="swatch" style="--swatch: var(--bg)"><div class="swatch__chip"></div>Background <code>#F8FAF9</code></div>
+        <div class="swatch" style="--swatch: var(--surface)"><div class="swatch__chip"></div>Surface <code>#FFFFFF</code></div>
+        <div class="swatch" style="--swatch: var(--ink)"><div class="swatch__chip"></div>Text <code>#1F2937</code></div>
+        <div class="swatch" style="--swatch: var(--ink-3)"><div class="swatch__chip"></div>Secondary text</div>
+        <div class="swatch" style="--swatch: var(--line)"><div class="swatch__chip"></div>Hairline</div>
+        <div class="swatch" style="--swatch: var(--accent-soft)"><div class="swatch__chip"></div>Selected</div>
+        <div class="swatch" style="--swatch: var(--warning-soft)"><div class="swatch__chip"></div>Warning</div>
         <div class="swatch" style="--swatch: var(--danger)"><div class="swatch__chip"></div>Danger</div>
+        <div class="swatch" style="--swatch: var(--info-soft)"><div class="swatch__chip"></div>Info</div>
       </div>
     </section>
 
     <section class="stack" aria-labelledby="h-type">
       <h2 id="h-type">Typography</h2>
+      <p class="muted">Geist for the application, Plus Jakarta Sans for customer-facing headings. Weights 400, 500 and 600 only.</p>
       <div class="card card__pad stack">
-        <h1>Heading one</h1><h2>Heading two</h2><h3>Heading three</h3>
-        <p>Body text is 16px with a 1.5 line height. <span class="muted">Muted text is for supporting detail.</span></p>
-        <p class="num">Tabular figures: 0123456789</p>
+        <div><small class="muted">Page title: 24 / 600</small><h1>Heading one</h1></div>
+        <div><small class="muted">Section title: 20 / 600</small><h2>Heading two</h2></div>
+        <div><small class="muted">Card title: 17 / 600</small><h3>Heading three</h3></div>
+        <div><small class="muted">Body: 15 / 400 / 1.55</small><p>Body text is 15px with a 1.55 line height. <span class="muted">Muted text is for supporting detail.</span></p></div>
+        <div><small class="muted">Small: 13 / 400</small><p style="font-size:var(--fs-sm)">Table cells, hints and metadata use 13px.</p></div>
+        <p class="num">Tabular figures: ₦2,500.00 · 0123456789</p>
+        <p style="font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600">Customer-facing heading (Plus Jakarta Sans)</p>
       </div>
+    </section>
+
+    <section class="stack" aria-labelledby="h-icons">
+      <h2 id="h-icons">Icons</h2>
+      <p class="muted">Lucide geometry, 24px grid, 1.75 stroke. One sprite: <code>shared/assets/icons.svg</code>.</p>
+      <div class="icon-grid" id="icon-grid"></div>
     </section>
 
     <section class="stack" aria-labelledby="h-btn">
@@ -101,7 +124,7 @@
       <h2 id="h-badge">Status badges</h2>
       <div class="row">
         <span class="badge" data-status="PENDING">Pending</span><span class="badge" data-status="CONFIRMED">Confirmed</span>
-        <span class="badge" data-status="SERVING">Serving</span><span class="badge" data-status="SERVED">Served</span>
+        <span class="badge" data-status="SERVING">Preparing</span><span class="badge" data-status="READY_FOR_PICKUP">Ready</span><span class="badge" data-status="COMPLETED">Completed</span>
         <span class="badge" data-status="REJECTED">Rejected</span><span class="badge" data-status="CANCELLED">Cancelled</span>
         <span class="badge" data-status="UNPAID">Unpaid</span><span class="badge" data-status="PAID">Paid</span>
       </div>
@@ -151,7 +174,7 @@
           <thead role="rowgroup"><tr role="row"><th role="columnheader">Code</th><th role="columnheader">Type</th><th role="columnheader">Status</th><th role="columnheader">Total</th></tr></thead>
           <tbody role="rowgroup">
             <tr role="row"><td role="cell" data-label="Code">001</td><td role="cell" data-label="Type">Pickup</td><td role="cell" data-label="Status"><span class="badge" data-status="PENDING">Pending</span></td><td role="cell" data-label="Total" class="num">0.00</td></tr>
-            <tr role="row"><td role="cell" data-label="Code">002</td><td role="cell" data-label="Type">Dine in</td><td role="cell" data-label="Status"><span class="badge" data-status="SERVING">Serving</span></td><td role="cell" data-label="Total" class="num">0.00</td></tr>
+            <tr role="row"><td role="cell" data-label="Code">002</td><td role="cell" data-label="Type">Dine in</td><td role="cell" data-label="Status"><span class="badge" data-status="SERVING">Preparing</span></td><td role="cell" data-label="Total" class="num">0.00</td></tr>
           </tbody>
         </table>
       </div>

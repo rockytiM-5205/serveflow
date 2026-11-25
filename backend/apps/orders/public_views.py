@@ -1,20 +1,24 @@
-"""Customer-facing order endpoints. No cookies and no sign-in: the order token is the credential."""
+"""Customer-facing order endpoints. Guests need no account: the order token is the credential. A signed-in customer account is
+only used to put a new order into that customer's history."""
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.common.authentication import CsrfSessionAuthentication
 from apps.common.schema import SLUG_PARAM
+from apps.restaurants import hours
 from apps.restaurants.models import Restaurant
 
 from . import idempotency
-from .models import ActorType, IdempotencyScope, Order, OrderStatus
-from .serializers import OrderCreatedSerializer, OrderCreateSerializer, PublicOrderSerializer
-from .services import create_order
+from .models import ActorType, IdempotencyScope, Order, OrderSource, OrderStatus
+from .serializers import PUBLIC_ITEMS, OrderCreatedSerializer, OrderCreateSerializer, PublicOrderSerializer
+from .services import claim_payment, create_order
 from .throttles import OrderPhoneThrottle
 from .tokens import make_token, parse_token, verify_token
 from .workflow import change_status
@@ -35,7 +39,7 @@ def load_order(token):
     if public_id is not None:
         order = (
             Order.objects.select_related("restaurant")
-            .prefetch_related("items", "events")
+            .prefetch_related(PUBLIC_ITEMS, "events")
             .filter(public_id=public_id)
             .first()
         )
@@ -45,7 +49,8 @@ def load_order(token):
 
 
 class OrderCreateView(APIView):
-    authentication_classes = []
+    # Guests need nothing. A signed-in customer account is recognised (so the order lands in their history); CSRF is then enforced.
+    authentication_classes = [CsrfSessionAuthentication]
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle, OrderPhoneThrottle]
     throttle_scope = "order_create"
@@ -61,6 +66,10 @@ class OrderCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.to_service_data()
         request_hash = idempotency.fingerprint({**data, "lines": sorted(data["lines"]), "slug": slug})
+        # An order that arrived with a valid API key (checked by the platform middleware) is an API order; anything else
+        # came through ServeFlow's own pages. Both follow the same rules and share one allowance.
+        data["customer"] = getattr(request.user, "customer_profile", None)  # None for guests and for restaurant users
+        data["source"] = OrderSource.API if getattr(request, "platform_credential_id", None) else OrderSource.MARKETPLACE
 
         stored = idempotency.find_replay(restaurant, IdempotencyScope.ORDER_CREATE, key, request_hash)
         if stored:
@@ -81,14 +90,14 @@ class OrderCreateView(APIView):
 
 
 class PublicOrderView(APIView):
-    authentication_classes = []
+    authentication_classes = [CsrfSessionAuthentication]  # read-only: a signed-in customer is recognised so the page knows whether they may review
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "order_lookup"
 
     @extend_schema(parameters=[TOKEN_PARAM], responses=PublicOrderSerializer, summary="Look up your order by its link token")
     def get(self, request, token):
-        return Response(PublicOrderSerializer(load_order(token)).data, headers=PRIVATE_HEADERS)
+        return Response(PublicOrderSerializer(load_order(token), context={"request": request}).data, headers=PRIVATE_HEADERS)
 
 
 class PublicOrderCancelView(APIView):
@@ -102,3 +111,47 @@ class PublicOrderCancelView(APIView):
         order = load_order(token)
         change_status(order=order, to_status=OrderStatus.CANCELLED, actor_type=ActorType.CUSTOMER)
         return Response(PublicOrderSerializer(load_order(token)).data, headers=PRIVATE_HEADERS)
+
+
+class PublicOrderPaidView(APIView):
+    """The customer says they have paid. The restaurant still has to confirm it before anything is prepared."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "order_cancel"
+
+    @extend_schema(parameters=[TOKEN_PARAM], request=None, responses=PublicOrderSerializer, summary="Tell the restaurant you have paid. They confirm it before preparing.")
+    def post(self, request, token):
+        claim_payment(load_order(token))
+        return Response(PublicOrderSerializer(load_order(token)).data, headers=PRIVATE_HEADERS)
+
+
+class PickupSlotSerializer(serializers.Serializer):
+    at = serializers.DateTimeField()
+    date = serializers.DateField()
+    day = serializers.CharField()
+    time = serializers.CharField()
+
+
+class PickupSlotsResponseSerializer(serializers.Serializer):
+    minimum_minutes = serializers.IntegerField()
+    timezone = serializers.CharField()
+    currency = serializers.CharField()
+    pickup_fee = serializers.DecimalField(max_digits=8, decimal_places=2)
+    slots = PickupSlotSerializer(many=True)
+
+
+class PickupSlotsView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "order_lookup"
+
+    @extend_schema(parameters=[SLUG_PARAM], responses=PickupSlotsResponseSerializer, summary="Times a customer can collect a pickup order, and the pickup fee")
+    def get(self, request, slug):
+        restaurant = get_object_or_404(Restaurant.objects.filter(is_active=True).prefetch_related("opening_periods"), slug=slug)
+        return Response({
+            "minimum_minutes": hours.pickup_lead_minutes(), "timezone": restaurant.timezone, "currency": restaurant.currency,
+            "pickup_fee": restaurant.pickup_fee, "slots": hours.pickup_slots(restaurant),
+        })

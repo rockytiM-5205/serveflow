@@ -10,6 +10,7 @@ from apps.menu import urls as menu_urls
 from apps.orders import urls as order_urls
 from apps.restaurants import urls as restaurant_urls
 from apps.restaurants.models import MembershipRole
+from apps.reviews import urls as review_urls
 from apps.restaurants.permissions import ROLE_RANK, HasRestaurantRole, RestaurantScopedMixin
 
 pytestmark = pytest.mark.django_db
@@ -134,7 +135,7 @@ def test_deactivated_user_session_is_rejected(api_client, make_user, make_restau
 
 
 def test_every_restaurant_scoped_view_uses_the_tenant_base():
-    patterns = [*restaurant_urls.urlpatterns, *menu_urls.urlpatterns, *audit_urls.urlpatterns, *order_urls.urlpatterns]
+    patterns = [*restaurant_urls.urlpatterns, *menu_urls.urlpatterns, *audit_urls.urlpatterns, *order_urls.urlpatterns, *review_urls.urlpatterns]
     assert patterns
     for pattern in patterns:
         view_class = pattern.callback.view_class

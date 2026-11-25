@@ -33,3 +33,5 @@ SECURE_HSTS_PRELOAD = False
 # Only enable behind a trusted reverse proxy that sets and sanitises this header.
 if env.bool("DJANGO_TRUST_PROXY_SSL_HEADER", default=False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SERVE_MEDIA_FILES = False  # the web server (or object storage) serves MEDIA_ROOT in production

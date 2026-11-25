@@ -1,0 +1,20 @@
+{
+  "id": "/restaurant-dashboard/",
+  "name": "ServeFlow for restaurants",
+  "short_name": "ServeFlow",
+  "description": "Take, track and serve your restaurant's orders.",
+  "start_url": "/restaurant-dashboard/orders.html",
+  "scope": "/restaurant-dashboard/",
+  "display": "standalone",
+  "background_color": "#f4f7f5",
+  "theme_color": "#064e3b",
+  "icons": [
+    { "src": "/shared/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Orders", "url": "/restaurant-dashboard/orders.html" },
+    { "name": "Menu", "url": "/restaurant-dashboard/menu.html" }
+  ]
+}

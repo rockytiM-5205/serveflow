@@ -103,3 +103,13 @@ function validateTable() {
 }
 tableInput.addEventListener("blur", validateTable);
 tableInput.addEventListener("input", () => tableInput.value.trim() && validateTable());
+
+/* ---------- Icon sprite listing ---------- */
+const iconGrid = document.getElementById("icon-grid");
+fetch(new URL("assets/icons.svg", import.meta.url.replace("/js/design-system.js", "/")))
+  .then((r) => r.text())
+  .then((text) => {
+    const ids = [...text.matchAll(/id="i-([a-z0-9-]+)"/g)].map((m) => m[1]);
+    iconGrid.replaceChildren(...ids.map((id) => el("div", { class: "icon-cell" }, icon(id), id)));
+  })
+  .catch(() => {});

@@ -8,3 +8,5 @@ djangorestframework==3.18.3     # supports Django 5.2
 drf-spectacular==0.30.0         # OpenAPI 3 schema generation
 psycopg[binary]>=3.2,<4         # PostgreSQL driver (psycopg 3)
 django-environ>=0.12,<1         # .env loading
+pywebpush>=2.0,<3                # order alerts on staff devices (Web Push); alerts stay off if it isn't installed
+Pillow>=11,<13                  # image uploads (restaurant pictures, menu photos): checked and re-encoded on upload

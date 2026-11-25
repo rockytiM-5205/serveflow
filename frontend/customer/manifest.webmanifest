@@ -1,0 +1,16 @@
+{
+  "id": "/customer/marketplace.html",
+  "name": "ServeFlow: order from restaurants",
+  "short_name": "ServeFlow",
+  "description": "Find restaurants, order from your phone and follow your order.",
+  "start_url": "/customer/marketplace.html",
+  "scope": "/customer/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#064e3b",
+  "icons": [
+    { "src": "/shared/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/shared/assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

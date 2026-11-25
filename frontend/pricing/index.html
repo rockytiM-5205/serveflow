@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="same-origin">
+  <link rel="stylesheet" href="../shared/css/fonts.css">
+  <link rel="stylesheet" href="../shared/css/tokens.css">
+  <link rel="stylesheet" href="../shared/css/base.css">
+  <link rel="stylesheet" href="../shared/css/components.css">
+  <link rel="stylesheet" href="../shared/css/plans.css">
+  <title>Plans and pricing · ServeFlow</title>
+  <meta name="description" content="ServeFlow plans, what each includes, and how payment works.">
+  <script type="module" src="pricing.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <main class="pricing-page" id="main">
+    <div class="pricing-bar">
+      <a class="brand" href="../index.html"><span class="brand__mark"><svg class="icon" aria-hidden="true"><use href="../shared/assets/icons.svg#i-leaf"/></svg></span>ServeFlow</a>
+      <a class="btn btn--secondary btn--sm" href="../restaurant-dashboard/login.html">Sign in</a>
+    </div>
+    <header class="stack">
+      <h1>Plans and pricing</h1>
+      <p class="muted">Pick a plan, try it, then pay by bank transfer. No card is needed to start.</p>
+    </header>
+    <section aria-labelledby="plans-h" class="stack">
+      <h2 id="plans-h">Plans</h2>
+      <div id="plans" aria-live="polite"><div class="skeleton skeleton--line" style="height:8rem"></div></div>
+    </section>
+    <section aria-labelledby="pay-h" class="stack">
+      <h2 id="pay-h">How paying works</h2>
+      <div id="how"></div>
+    </section>
+  </main>
+  <noscript><p class="muted">Plans load with JavaScript.</p></noscript>
+</body>
+</html>

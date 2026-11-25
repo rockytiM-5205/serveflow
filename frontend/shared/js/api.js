@@ -39,10 +39,30 @@ function errorFrom(response, data) {
   });
 }
 
-export async function request(path, { method = "GET", body, signal, timeoutMs = config.requestTimeoutMs, headers: extraHeaders = {} } = {}) {
+/** Reads that fail to connect (or get a 502/503/504 from a busy or restarting server) are tried again quietly before the person
+ * sees an error. Only reads: a write is never repeated behind the person's back. Tests set delaysMs to [] to skip the waiting. */
+export const retryPolicy = { delaysMs: [300, 900] };
+const transient = (err) => err instanceof ApiError && (err.code === "network_error" || [502, 503, 504].includes(err.status));
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function request(path, options = {}) {
+  if ((options.method ?? "GET") !== "GET") return requestOnce(path, options);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await requestOnce(path, options);
+    } catch (err) {
+      if (!transient(err) || attempt >= retryPolicy.delaysMs.length || options.signal?.aborted) throw err;
+      await pause(retryPolicy.delaysMs[attempt]);
+    }
+  }
+}
+
+async function requestOnce(path, { method = "GET", body, signal, timeoutMs = config.requestTimeoutMs, headers: extraHeaders = {} } = {}) {
   const headers = { Accept: "application/json", ...extraHeaders };
   const init = { method, headers, credentials: "same-origin", cache: "no-store" };
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    init.body = body; // the browser sets the multipart Content-Type and boundary itself
+  } else if (body !== undefined) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);
   }
@@ -76,7 +96,13 @@ export async function request(path, { method = "GET", body, signal, timeoutMs = 
         data = null;
       }
     }
-    if (!response.ok) throw errorFrom(response, data);
+    if (!response.ok) {
+      const failure = errorFrom(response, data);
+      if (failure.status === 402 && failure.code === "subscription_inactive" && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("serveflow:subscription-ended"));
+      }
+      throw failure;
+    }
     if (data === null) {
       // 2xx without JSON usually means the base URL points at the wrong server.
       throw new ApiError({ status: response.status, code: "invalid_response", message: "The server sent an unexpected response." });
@@ -96,6 +122,8 @@ export async function request(path, { method = "GET", body, signal, timeoutMs = 
 export const api = {
   get: (path, options) => request(path, { ...options, method: "GET" }),
   post: (path, body, options) => request(path, { ...options, method: "POST", body }),
+  put: (path, body, options) => request(path, { ...options, method: "PUT", body }),
   patch: (path, body, options) => request(path, { ...options, method: "PATCH", body }),
+  upload: (path, formData, options) => request(path, { ...options, method: "POST", body: formData }),
   delete: (path, options) => request(path, { ...options, method: "DELETE" }),
 };

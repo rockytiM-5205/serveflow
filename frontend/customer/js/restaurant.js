@@ -1,7 +1,12 @@
 /* Loads the restaurant named by "?r=<slug>" and handles the not-found and error cases. */
 import { ApiError, api } from "../../shared/js/api.js";
 import { el, emptyState, icon } from "../../shared/js/ui.js";
+import { isSubscriptionEnded, orderingPausedState } from "../../shared/js/subscription.js";
+import { robustImage } from "../../shared/js/images.js";
+import { isImageSource } from "../../shared/js/validators.js";
 import { parseSlug } from "./helpers.js";
+import { mountSiteNav } from "./site-nav.js";
+import { useHomeScreenIcon } from "../../shared/js/pwa.js";
 
 const content = () => document.getElementById("content");
 
@@ -31,10 +36,20 @@ export async function bootCustomer() {
   try {
     const restaurant = await api.get(`/restaurants/${encodeURIComponent(slug)}/`);
     document.getElementById("brand-name").textContent = restaurant.name;
+    if (isImageSource(restaurant.logo_url)) { // the restaurant's own logo replaces the generic mark
+      const mark = document.querySelector("#brand-link .brand__mark");
+      if (mark) mark.replaceChildren(robustImage({ src: restaurant.logo_url, className: "brand__logo", fallback: () => icon("leaf") })); // a logo that fails shows the ServeFlow leaf again
+    }
     document.getElementById("brand-link").href = `index.html?r=${encodeURIComponent(slug)}`;
+    if (isImageSource(restaurant.logo_url)) useHomeScreenIcon(restaurant.logo_url);
     document.title = `${restaurant.name} · ServeFlow`;
+    mountSiteNav({ slug });
     return { slug, restaurant };
   } catch (err) {
+    if (isSubscriptionEnded(err)) {
+      show(orderingPausedState());
+      return null;
+    }
     if (err instanceof ApiError && err.status === 404) {
       show(emptyState({
         iconName: "store",

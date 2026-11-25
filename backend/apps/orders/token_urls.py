@@ -6,4 +6,5 @@ from . import public_views
 urlpatterns = [
     path("<str:token>/", public_views.PublicOrderView.as_view(), name="public-order"),
     path("<str:token>/cancel/", public_views.PublicOrderCancelView.as_view(), name="public-order-cancel"),
+    path("<str:token>/paid/", public_views.PublicOrderPaidView.as_view(), name="public-order-paid"),
 ]

@@ -16,6 +16,8 @@ OWNER, MANAGER, STAFF = MembershipRole.OWNER, MembershipRole.MANAGER, Membership
 
 
 def can_create_restaurant(user):
+    if hasattr(user, "customer_profile"):
+        return False  # a customer account is not a restaurant account
     if user.is_superuser:
         return True
     if not settings.SELF_SERVICE:
@@ -57,6 +59,8 @@ def add_member(*, restaurant, actor, email, role, password="", first_name="", la
     email = email.strip().lower()
     with transaction.atomic():
         actor = _fresh_actor(restaurant, actor)
+        if role == OWNER:
+            raise Conflict("A restaurant has one admin, set up by ServeFlow. Add managers or staff instead.", code="single_owner")
         if role != STAFF and actor.role != OWNER:
             raise PermissionDenied("Only owners can add managers or owners.", code="insufficient_role")
         user = User.objects.filter(email=email).first()
@@ -87,6 +91,8 @@ def change_member(*, restaurant, actor, target, role=None, is_active=None):
             raise PermissionDenied("Only owners can change managers and owners.", code="insufficient_role")
 
         new_role = target.role if role is None else role
+        if new_role == OWNER and target.role != OWNER:
+            raise Conflict("A restaurant has one admin, set up by ServeFlow.", code="single_owner")
         new_active = target.is_active if is_active is None else is_active
         loses_an_owner = target.role == OWNER and target.is_active and not (new_role == OWNER and new_active)
         if loses_an_owner and not (

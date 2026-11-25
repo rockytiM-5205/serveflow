@@ -11,6 +11,15 @@ from apps.orders.models import Order, Payment
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
+def _later():
+    """A pickup time that is allowed: two hours from now."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    return (timezone.now() + timedelta(hours=2)).isoformat()
+
+
 
 def run_in_threads(jobs):
     results = [None] * len(jobs)
@@ -37,7 +46,7 @@ def test_simultaneous_orders_get_distinct_codes(shop):
     def job(n):
         def place():
             body = {
-                "customer_name": "Ada", "customer_phone": f"+44207946{n:04d}", "fulfilment_type": "PICKUP",
+                "customer_name": "Ada", "customer_phone": f"+44207946{n:04d}", "fulfilment_type": "PICKUP", "pickup_at": _later(),
                 "items": [{"menu_item_id": shop.rice.pk, "quantity": 1}],
             }
             return APIClient().post(url, body, format="json", HTTP_IDEMPOTENCY_KEY=uuid.uuid4().hex).status_code
@@ -52,7 +61,7 @@ def test_simultaneous_orders_get_distinct_codes(shop):
 def test_the_same_key_sent_at_once_creates_one_order(shop):
     url = reverse("public-order-create", kwargs={"slug": shop.restaurant.slug})
     body = {
-        "customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP",
+        "customer_name": "Ada", "customer_phone": "+442079460958", "fulfilment_type": "PICKUP", "pickup_at": _later(),
         "items": [{"menu_item_id": shop.rice.pk, "quantity": 1}],
     }
     key = uuid.uuid4().hex
@@ -67,7 +76,7 @@ def test_the_same_key_sent_at_once_creates_one_order(shop):
 
 
 def test_two_staff_paying_the_same_order_record_one_payment(shop, order_in, make_user, make_membership):
-    order = order_in("SERVED")
+    order = order_in("COMPLETED")
     clients = []
     for _ in range(2):
         user = make_user()

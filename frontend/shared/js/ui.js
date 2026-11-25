@@ -23,7 +23,8 @@ export function el(tag, props = {}, ...children) {
     else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
     else node.setAttribute(key, value === true ? "" : String(value));
   }
-  node.append(...children);
+  // `cond ? el(...) : null` is common; append() would turn null into the text "null", so skip empty children.
+  node.append(...children.filter((child) => child !== null && child !== undefined && child !== false));
   return node;
 }
 
@@ -42,7 +43,7 @@ export function formatMoney(amount, currency, locale) {
   const n = typeof amount === "number" ? amount : Number.parseFloat(amount);
   if (!Number.isFinite(n)) return "";
   try {
-    return new Intl.NumberFormat(locale || undefined, { style: "currency", currency }).format(n);
+    return new Intl.NumberFormat(locale || undefined, { style: "currency", currency, currencyDisplay: "narrowSymbol" }).format(n); // ₦2,500.00, $5.00
   } catch {
     return `${n.toFixed(2)} ${currency ?? ""}`.trim();
   }

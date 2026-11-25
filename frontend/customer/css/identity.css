@@ -1,0 +1,33 @@
+/* The signed-in customer, made obvious: a badge with their initial and name in the header, an account menu, and a card on My orders.
+ * Shared by both designs: only tokens both define. */
+.user-avatar { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--accent); color: #fff; font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
+.user-avatar--lg { width: 3rem; height: 3rem; font-size: var(--fs-lg); }
+
+.site-nav__account { position: relative; }
+.account-chip { display: inline-flex; align-items: center; gap: var(--s-2); max-width: 11rem; min-height: var(--tap); padding: 0.2rem 0.55rem 0.2rem 0.25rem; background: var(--surface); border: 1px solid var(--line-strong, var(--line)); border-radius: 999px; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.account-chip:hover { background: var(--surface-sunken); }
+.account-chip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.account-chip > .icon { width: 1rem; height: 1rem; color: var(--ink-3); transition: transform 160ms ease; }
+.account-chip[aria-expanded="true"] > .icon { transform: rotate(180deg); }
+.account-pop { position: absolute; right: 0; top: calc(100% + var(--s-2)); z-index: 40; width: min(17rem, 86vw); display: grid; gap: 2px; padding: var(--s-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 14px 34px -12px rgb(0 0 0 / 0.3); }
+.account-pop__who { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-2) var(--s-3); margin-bottom: var(--s-1); border-bottom: 1px solid var(--line); min-width: 0; }
+.account-pop__who > div { display: grid; min-width: 0; line-height: 1.3; }
+.account-pop__who strong, .account-pop__who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-pop__who small { color: var(--ink-3); }
+.account-pop__link { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: var(--tap); padding: 0 var(--s-3); border: 0; border-radius: var(--r-md); background: none; color: var(--ink); font: inherit; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer; }
+.account-pop__link:hover { background: var(--surface-sunken); }
+.account-pop__link .icon { color: var(--ink-3); }
+@media (max-width: 359px) { .account-chip__name { display: none; } }
+/* on a phone the badge and name already say who this is, so the menu button keeps just its icon to leave room for the restaurant's name */
+@media (max-width: 479px) { .site-nav:has(.account-chip) .site-nav__toggle > span { display: none; } }
+/* keep a long restaurant name from pushing the buttons off the screen */
+.topbar__inner > :first-child { min-width: 0; }
+.topbar .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.site-nav { gap: var(--s-2); }
+
+.signed-in-dot { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--ink-3); font-size: var(--fs-sm); }
+.signed-in-dot::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 3px rgb(22 163 74 / 0.18); }
+.profile-card { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4); }
+.profile-card__who { display: grid; flex: 1; min-width: 0; gap: 2px; line-height: 1.3; }
+.profile-card__who strong { font-size: var(--fs-lg); overflow: hidden; text-overflow: ellipsis; }
+.profile-card__email { color: var(--ink-3); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

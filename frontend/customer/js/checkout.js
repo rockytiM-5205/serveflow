@@ -1,11 +1,17 @@
 import { ApiError, api } from "../../shared/js/api.js";
 import { buildForm } from "../../shared/js/form-builder.js";
 import { el, emptyState, formatMoney, icon, toast } from "../../shared/js/ui.js";
+import { currentCustomer } from "./account-link.js";
+import { fullName } from "./account-helpers.js";
+import { lateFeeText } from "../../shared/js/late-policy.js";
+import { isSubscriptionEnded, orderingPausedState } from "../../shared/js/subscription.js";
 import { clearIdempotencyKey, createCart, describeCart, fromCents, idempotencyKeyFor, saveLastOrder } from "./cart.js";
 import { bootCustomer, show } from "./restaurant.js";
 
 const ORDER_ERRORS = {
   item_unavailable: "Some items are no longer available, so we removed them from your order. Please check it and try again.",
+  payment_details_missing: "This restaurant can't take orders yet. Please ask the restaurant directly.",
+  subscription_inactive: "This restaurant isn't taking orders online right now. Your order was not placed. Please ask the restaurant directly.",
   throttled: "Too many attempts. Please wait a minute and try again.",
   network_error: "We couldn't reach the server, so your order has not been placed. Check your connection and press Place order again. Retrying never creates a duplicate.",
   timeout: "The server took too long, so your order may not have been placed. Press Place order again. Retrying never creates a duplicate.",
@@ -16,7 +22,6 @@ async function main() {
   if (!ctx) return;
   const { slug, restaurant } = ctx;
   const menuUrl = `menu.html?r=${encodeURIComponent(slug)}`;
-  document.getElementById("back-link").href = menuUrl;
   const back = (label) => el("a", { class: "btn btn--secondary", href: menuUrl }, label);
 
   if (!restaurant.accepting_orders) {
@@ -31,6 +36,10 @@ async function main() {
   try {
     menu = await api.get(`/restaurants/${encodeURIComponent(slug)}/menu/`);
   } catch (err) {
+    if (isSubscriptionEnded(err)) {
+      show(orderingPausedState());
+      return;
+    }
     show(emptyState({
       iconName: "alert", title: "Couldn't load your order", text: err instanceof ApiError ? err.message : "Something went wrong.",
       action: el("button", { class: "btn btn--secondary", type: "button", onclick: () => location.reload() }, icon("refresh"), "Try again"),
@@ -38,6 +47,18 @@ async function main() {
     return;
   }
   const currency = menu.restaurant.currency;
+  let slots = [];
+  if (restaurant.pickup_enabled) {
+    try {
+      slots = (await api.get(`/restaurants/${encodeURIComponent(slug)}/pickup-slots/`)).slots;
+    } catch {
+      slots = []; // no times means no pickup option, never a guessed time
+    }
+  }
+  const pickupFee = Number(restaurant.pickup_fee) || 0;
+  const pickupDays = [...new Map(slots.map((slot) => [slot.date, slot.day])).entries()].map(([value, label]) => ({ value, label }));
+  const timesOn = (date) => slots.filter((slot) => slot.date === date).map((slot) => ({ value: slot.at, label: slot.time }));
+  let chosenType = null;
   const itemsById = new Map(menu.categories.flatMap((c) => c.items).map((item) => [item.id, item]));
   const cart = createCart(slug);
   const removed = cart.reconcile(itemsById);
@@ -45,13 +66,18 @@ async function main() {
   const summary = el("section", { class: "card card__pad stack", "aria-labelledby": "summary-h" });
   const renderSummary = () => {
     const { lines, totalCents } = describeCart(cart, itemsById);
+    const feeCents = chosenType === "PICKUP" ? Math.round(pickupFee * 100) : 0; // cents, so nothing is added to a text value
+    const feeLine = chosenType === "PICKUP" && pickupFee > 0
+      ? el("div", { class: "summary-lines" }, el("span", {}, "Pickup fee"), el("span", { class: "price" }, formatMoney(pickupFee, currency))) : null;
     summary.replaceChildren(
-      el("div", { class: "section-head", style: "margin:0" }, el("h2", { id: "summary-h" }, "Your order"),
+      ...[el("div", { class: "section-head", style: "margin:0" }, el("h2", { id: "summary-h" }, "Your order"),
         el("a", { href: menuUrl }, "Edit")),
       el("ul", { class: "summary-lines" }, ...lines.map(({ item, quantity, lineCents }) =>
         el("li", {}, el("span", {}, `${quantity} × ${item.name}`), el("span", { class: "price" }, formatMoney(fromCents(lineCents), currency))))),
-      el("div", { class: "total-row" }, el("span", {}, "Estimated total"), el("strong", { class: "price" }, formatMoney(fromCents(totalCents), currency))),
-      el("p", { class: "muted", style: "font-size:var(--fs-sm)" }, "The restaurant works out the final total when you place the order."),
+      feeLine,
+      el("div", { class: "total-row" }, el("span", {}, "Total to pay"), el("strong", { class: "price" }, formatMoney(fromCents(totalCents + feeCents), currency))),
+      el("p", { class: "muted", style: "font-size:var(--fs-sm)" }, "You pay by bank transfer right after you place the order. The restaurant starts preparing once it confirms your payment."),
+      ].filter(Boolean),  // a native replaceChildren turns null into the word "null"
     );
   };
 
@@ -66,12 +92,34 @@ async function main() {
   renderSummary();
 
   const options = [];
-  if (restaurant.pickup_enabled) options.push({ value: "PICKUP", label: "Pickup", hint: "Collect it when it's ready", icon: "bag" });
+  if (restaurant.pickup_enabled && slots.length) {
+    options.push({ value: "PICKUP", label: "Pickup", hint: pickupFee > 0 ? `Choose a time · ${formatMoney(pickupFee, currency)} pickup fee` : "Choose a time to collect it", icon: "bag" });
+  }
+  if (options.length === 0 && !restaurant.dine_in_enabled) {
+    show(emptyState({
+      iconName: "clock", title: "No pickup times right now",
+      text: "This restaurant has no pickup times available at the moment. Please try again later.", action: back("Back to the menu"),
+    }));
+    return;
+  }
   if (restaurant.dine_in_enabled) options.push({ value: "DINE_IN", label: "Dine in", hint: "Served at your table", icon: "utensils" });
   const onlyType = options.length === 1 ? options[0].value : null;
 
+  const latePolicy = restaurant.late_policy ?? null; // the restaurant's late pickup rules, if it has any
   const fields = [];
   if (!onlyType) fields.push({ name: "fulfilment_type", label: "How would you like it?", type: "radio", required: true, options });
+  if (slots.length) {
+    fields.push(
+      { name: "pickup_day", label: "Pickup day", type: "select", options: pickupDays },
+      { name: "pickup_time", label: `Pickup time (from ${restaurant.pickup_min_minutes ?? 30} minutes from now)`, type: "select", options: timesOn(pickupDays[0].value) },
+    );
+    if (latePolicy) {
+      fields.push({
+        name: "accept_late", type: "checkbox", required: false,
+        label: `I have read and accept the late pickup policy. ${lateFeeText(latePolicy, (v) => formatMoney(v, currency))}`,
+      });
+    }
+  }
   fields.push(
     { name: "customer_name", label: "Your name", type: "text", required: true, maxlength: 80, autocomplete: "name" },
     {
@@ -86,11 +134,16 @@ async function main() {
   const { form, controls } = buildForm({
     idPrefix: "co",
     fields,
-    values: { fulfilment_type: options[0].value },
+    // a <select> given no value shows blank, so start on the first day and the first time
+    values: { fulfilment_type: options[0].value, pickup_day: pickupDays[0]?.value, pickup_time: pickupDays[0] ? timesOn(pickupDays[0].value)[0]?.value : undefined },
     submitLabel: "Place order",
     validateForm: (values) => {
       const type = values.fulfilment_type || onlyType;
-      return type === "DINE_IN" && restaurant.requires_table_number && !values.table_number ? { table_number: "Enter your table number." } : {};
+      const errors = {};
+      if (type === "DINE_IN" && restaurant.requires_table_number && !values.table_number) errors.table_number = "Enter your table number.";
+      if (type === "PICKUP" && !values.pickup_time) errors.pickup_time = "Choose a pickup time.";
+      if (type === "PICKUP" && latePolicy && !values.accept_late) errors.accept_late = "Please accept the late pickup policy to order for pickup.";
+      return errors;
     },
     submit: async (values) => {
       const type = values.fulfilment_type || onlyType;
@@ -99,15 +152,20 @@ async function main() {
         customer_phone: values.customer_phone,
         fulfilment_type: type,
         table_number: type === "DINE_IN" && values.table_number ? values.table_number : null,
+        pickup_at: type === "PICKUP" ? values.pickup_time : null,
+        accept_late_policy: type === "PICKUP" && !!latePolicy && !!values.accept_late,
         notes: values.notes,
         items: cart.entries().map(([id, quantity]) => ({ menu_item_id: id, quantity })),
       };
       // The same order retried reuses its key, so a dropped connection can never place it twice.
       const key = idempotencyKeyFor(slug, payload);
       try {
-        return await api.post(`/restaurants/${encodeURIComponent(slug)}/orders/`, payload, { headers: { "Idempotency-Key": key } });
+        return await api.post(`/restaurants/${encodeURIComponent(slug)}/checkout/`, payload, { headers: { "Idempotency-Key": key } });
       } catch (err) {
         if (!(err instanceof ApiError)) throw err;
+        if (err.code === "validation_error" && err.details?.pickup_at) {
+          throw new ApiError({ status: err.status, code: err.code, message: String(err.details.pickup_at[0]), details: { pickup_time: err.details.pickup_at } });
+        }
         if (err.code === "item_unavailable") {
           cart.remove((err.details?.items ?? []).map((problem) => problem.id));
           if (cart.count() === 0) location.reload();
@@ -128,7 +186,26 @@ async function main() {
   const tableWrap = controls.get("table_number").wrap;
   const typeControl = controls.get("fulfilment_type");
   const currentType = () => typeControl?.radios.find((r) => r.checked)?.value ?? onlyType;
-  const syncTable = () => { tableWrap.hidden = currentType() !== "DINE_IN"; };
+  const me = await currentCustomer();
+  if (me) {
+    if (fullName(me)) controls.get("customer_name")?.input && (controls.get("customer_name").input.value = fullName(me));
+    if (me.phone) controls.get("customer_phone")?.input && (controls.get("customer_phone").input.value = me.phone);
+  }
+  const accountNote = me
+    ? el("p", { class: "muted", role: "status" }, `Signed in as ${me.first_name}. This order will be saved to your account.`)
+    : el("p", { class: "muted" }, "Ordering as a guest. ", el("a", { href: `account.html?next=${encodeURIComponent(`checkout.html?r=${slug}`)}` }, "Sign in"), " to keep your order history.");
+  form.prepend(accountNote);
+  const pickupControls = ["pickup_day", "pickup_time", "accept_late"].map((name) => controls.get(name)).filter(Boolean);
+  const syncTable = () => {
+    chosenType = currentType();
+    tableWrap.hidden = chosenType !== "DINE_IN";
+    pickupControls.forEach((c) => { c.wrap.hidden = chosenType !== "PICKUP"; });
+    renderSummary();
+  };
+  controls.get("pickup_day")?.input.addEventListener("change", (event) => {
+    const time = controls.get("pickup_time").input;
+    time.replaceChildren(...timesOn(event.target.value).map((o) => el("option", { value: o.value }, o.label)));
+  });
   typeControl?.radios.forEach((radio) => radio.addEventListener("change", syncTable));
   syncTable();
 

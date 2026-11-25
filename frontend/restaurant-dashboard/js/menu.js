@@ -1,7 +1,10 @@
 import { ApiError, api } from "../../shared/js/api.js";
+import { DISH_OPTIONS } from "../../shared/js/dish-kinds.js";
 import { confirmDialog, el, emptyState, formatMoney, icon, toast } from "../../shared/js/ui.js";
-import { isHttpsUrl, isValidPrice, isValidSortOrder } from "../../shared/js/validators.js";
+import { isImageSource, isValidPrice, isValidSortOrder } from "../../shared/js/validators.js";
+import { attachBadge, liveBadge, startLive } from "../../shared/js/live.js";
 import { formDialog } from "./form-dialog.js";
+import { imagePicker, pictureForm } from "../../shared/js/image-picker.js";
 import { hasRole } from "./session.js";
 import { bootDashboard, handleSessionExpiry } from "./shell.js";
 
@@ -40,8 +43,9 @@ function itemFields(categories) {
       hint: "What one unit is: spoon, piece, portion, plate…",
     },
     {
-      name: "image_url", label: "Photo link (optional)", type: "text", maxlength: 500, hint: "A link starting with https://",
-      validate: (v) => (isHttpsUrl(v) ? null : "Use a link that starts with https://"),
+      name: "dish_kind", label: "Picture on the order plate", type: "select",
+      options: [{ value: "", label: "Automatic (from the name)" }, ...DISH_OPTIONS],
+      hint: "Customers see a plate of what they ordered while they follow their order. An item with a photo shows its photo; otherwise this picture.",
     },
     { name: "is_available", label: "Available now", type: "checkbox" },
   ];
@@ -62,18 +66,26 @@ async function main() {
     toast(err instanceof ApiError ? err.message : "Something went wrong.", { type: "error" });
   };
 
+  async function fetchAll() {
+    const [restaurant, cats, its] = await Promise.all([
+      api.get(`${base}/`),
+      api.get(`${base}/menu/categories/`),
+      api.get(`${base}/menu/items/${showArchived ? "?include_archived=1" : ""}`),
+    ]);
+    return { currency: restaurant.currency, categories: cats, items: its };
+  }
+
+  let lastSignature = "";
+  function apply(data) {
+    ({ currency, categories, items } = data);
+    lastSignature = JSON.stringify(data);
+    render();
+  }
+
   async function load() {
     content.replaceChildren(skeleton());
     try {
-      const [restaurant, cats, its] = await Promise.all([
-        api.get(`${base}/`),
-        api.get(`${base}/menu/categories/`),
-        api.get(`${base}/menu/items/${showArchived ? "?include_archived=1" : ""}`),
-      ]);
-      currency = restaurant.currency;
-      categories = cats;
-      items = its;
-      render();
+      apply(await fetchAll());
     } catch (err) {
       if (handleSessionExpiry(err, HREF)) return;
       const forbidden = err instanceof ApiError && err.status === 403;
@@ -105,18 +117,40 @@ async function main() {
     submit: (v) => api.patch(`${base}/menu/categories/${category.id}/`, v),
   }));
 
-  const toPayload = (v) => ({ ...v, image_url: v.image_url || null });
+  /** Save the picture choice after the item itself is saved. A failed upload never loses the item: they can retry from Edit. */
+  async function applyPicture(item, picker) {
+    try {
+      if (picker.file()) await api.upload(`${base}/menu/items/${item.id}/image/`, pictureForm(picker.file()));
+      else if (picker.removeRequested()) {
+        if (item.image) await api.delete(`${base}/menu/items/${item.id}/image/`);
+        if (item.image_url) await api.patch(`${base}/menu/items/${item.id}/`, { image_url: null }); // an older link, if that was the picture
+      }
+    } catch (err) {
+      toast(`The item was saved, but its picture wasn't: ${err instanceof ApiError ? err.message : "something went wrong."} Open Edit to try again.`, { type: "error" });
+    }
+  }
 
-  const newItem = () => saveAndReload("Item created.", () => formDialog({
-    title: "New item", fields: itemFields(categories), submitLabel: "Create item",
-    values: { unit_name: "portion", is_available: true },
-    submit: (v) => api.post(`${base}/menu/items/`, toPayload(v)),
+  /** The item form with a photo picker in it (photos are uploaded from the device, not linked). */
+  function itemDialog({ title, submitLabel, values, item }) {
+    let picker = null;
+    return formDialog({
+      title, submitLabel, fields: itemFields(categories), values,
+      onReady: (_controls, form) => {
+        picker = imagePicker({ label: "Photo (optional)", currentUrl: item?.image ?? item?.image_url ?? null, hint: "Saved at 4:3 (1000 \u00d7 750); the edges are cropped to fit." });
+        form.insertBefore(picker.node, form.querySelector(".dialog__footer"));
+      },
+      submit: async (v) => {
+        const saved = item ? await api.patch(`${base}/menu/items/${item.id}/`, v) : await api.post(`${base}/menu/items/`, v);
+        await applyPicture(saved, picker);
+      },
+    });
+  }
+
+  const newItem = () => saveAndReload("Item created.", () => itemDialog({
+    title: "New item", submitLabel: "Create item", values: { unit_name: "portion", is_available: true },
   }));
 
-  const editItem = (item) => saveAndReload("Item saved.", () => formDialog({
-    title: "Edit item", fields: itemFields(categories), values: item,
-    submit: (v) => api.patch(`${base}/menu/items/${item.id}/`, toPayload(v)),
-  }));
+  const editItem = (item) => saveAndReload("Item saved.", () => itemDialog({ title: "Edit item", submitLabel: "Save", values: item, item }));
 
   async function archiveItem(item) {
     const ok = await confirmDialog({
@@ -161,10 +195,12 @@ async function main() {
         el("button", { class: "btn btn--ghost btn--sm", type: "button", "aria-label": `Archive ${item.name}`, onclick: () => archiveItem(item) }, icon("trash")),
       );
     }
+    const photo = item.image ?? item.image_url;
     return el("li", { class: "item-row" },
+      isImageSource(photo) ? el("img", { class: "item-row__thumb", src: photo, alt: "", loading: "lazy", decoding: "async" }) : null,
       el("div", { class: "item-row__main" },
         el("span", { class: "member-name" }, item.name, item.archived ? el("span", { class: "badge", "data-status": "CANCELLED" }, "Archived") : null),
-        el("span", { class: "muted member-email" }, `${formatMoney(item.price, currency)} / ${item.unit_name}`),
+        el("span", { class: "muted member-email" }, `${formatMoney(item.price, currency)}${item.unit_name ? ` / ${item.unit_name}` : ""}`),
       ),
       actions,
     );
@@ -212,6 +248,24 @@ async function main() {
   }
 
   await load();
+
+  // Live: pick up changes other staff make (availability, new items) every 10 seconds.
+  const badge = liveBadge();
+  attachBadge(badge);
+  startLive({
+    badge,
+    intervalMs: 10000,
+    shouldSkip: () => Boolean(document.querySelector('dialog[open], [aria-busy="true"], .switch:disabled')),
+    refresh: async () => {
+      try {
+        const data = await fetchAll();
+        if (JSON.stringify(data) !== lastSignature) apply(data);
+      } catch (err) {
+        if (handleSessionExpiry(err, HREF)) return;
+        throw err;
+      }
+    },
+  });
 }
 
 main();

@@ -51,3 +51,12 @@
   .nav__item[aria-current="page"] { background: var(--accent-soft); }
   .shell__main { padding: var(--s-8); }
 }
+
+/* ---- Navigation markup shared with the premium theme (More button, restaurant block, secondary links) ---- */
+.nav__workspace, .nav__group { display: none; }
+.nav__item--secondary { display: none; }
+@media (min-width: 1024px) {
+  .nav__item--secondary { display: flex; }
+  .nav__more { display: none !important; }
+  .nav__workspace { display: flex; align-items: center; gap: var(--s-3); margin: 0 var(--s-3) var(--s-4); padding: var(--s-3); background: var(--surface-sunken); border-radius: var(--r-md); min-width: 0; }
+}
