@@ -1,5 +1,8 @@
 """Settings shared by every environment. Environment-specific modules extend this."""
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 from config.env import env, require
 
@@ -76,16 +79,31 @@ TEMPLATES = [
 ]
 
 # --- Database: PostgreSQL only -----------------------------------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": require("POSTGRES_DB", _DB_HINT),
-        "USER": require("POSTGRES_USER", _DB_HINT),
-        "PASSWORD": require("POSTGRES_PASSWORD", _DB_HINT),
-        # "HOST": require("POSTGRES_HOST", _DB_HINT),
-        # "PORT": require("POSTGRES_PORT", _DB_HINT),
+# Hosted (Neon, Render, ...): set DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+# Local development: leave DATABASE_URL unset and use the POSTGRES_* variables in .env.
+if os.environ.get("DATABASE_URL", "").strip():
+    _default_db = env.db("DATABASE_URL")
+    if not _default_db["ENGINE"].endswith("postgresql"):
+        raise ImproperlyConfigured(f"DATABASE_URL must be a PostgreSQL URL. {_DB_HINT}")
+    _default_db["CONN_MAX_AGE"] = env.int("DJANGO_DB_CONN_MAX_AGE", default=60)
+    _default_db["CONN_HEALTH_CHECKS"] = True
+    # Neon's pooled address (host contains "-pooler") runs PgBouncer in transaction mode: no server-side cursors and no
+    # server-side prepared statements. Set DJANGO_DB_POOLED=True for any other PgBouncer.
+    if "-pooler" in _default_db.get("HOST", "") or env.bool("DJANGO_DB_POOLED", default=False):
+        _default_db["DISABLE_SERVER_SIDE_CURSORS"] = True
+        _default_db.setdefault("OPTIONS", {})["prepare_threshold"] = None
+    DATABASES = {"default": _default_db}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": require("POSTGRES_DB", _DB_HINT),
+            "USER": require("POSTGRES_USER", _DB_HINT),
+            "PASSWORD": require("POSTGRES_PASSWORD", _DB_HINT),
+            "HOST": env("POSTGRES_HOST", default="localhost"),
+            "PORT": env("POSTGRES_PORT", default="5432"),
+        }
     }
-}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Authentication ----------------------------------------------------------
@@ -132,6 +150,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.common.exceptions.api_exception_handler",
+    # How many reverse proxies sit in front of Django (Vercel + Render = 2). With 0 the throttles trust the whole
+    # X-Forwarded-For header, which a client can fake; set DJANGO_NUM_PROXIES in production (see docs/deploy.md).
+    "NUM_PROXIES": env.int("DJANGO_NUM_PROXIES", default=0) or None,
     "DEFAULT_THROTTLE_RATES": {
         "login_ip": "5/min",
         "login_email": "5/min",

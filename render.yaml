@@ -1,0 +1,43 @@
+# Render Blueprint for the ServeFlow backend (Django). The frontend is on Vercel and the database is on Neon.
+# Secrets are marked sync: false, so Render asks you for them in the dashboard and they never live in git.
+# Full steps: docs/deploy.md
+services:
+  - type: web
+    name: serveflow-api
+    runtime: python
+    plan: starter            # use free if you are only testing; a free service sleeps when idle
+    rootDir: backend
+    buildCommand: pip install -r requirements/base.txt && python manage.py collectstatic --noinput
+    # Migrations run on Neon's DIRECT (non-pooled) address; the app itself uses the pooled one. One worker with threads keeps
+    # the in-memory throttle counters correct (see docs/deploy.md before raising --workers).
+    startCommand: DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" python manage.py migrate --noinput && gunicorn config.wsgi:application --workers 1 --threads 8 --timeout 60 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DJANGO_ENV
+        value: production
+      - key: DJANGO_SECRET_KEY          # 50+ random characters: python -c "import secrets; print(secrets.token_urlsafe(64))"
+        sync: false
+      - key: DATABASE_URL               # Neon POOLED connection string (host contains -pooler)
+        sync: false
+      - key: DIRECT_DATABASE_URL        # Neon DIRECT connection string (no -pooler), used only to migrate
+        sync: false
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS  # your Vercel address, e.g. https://serveflow.vercel.app (and your own domain later)
+        sync: false
+      - key: DJANGO_ADMIN_URL           # something non-obvious, e.g. manage-7f3k/
+        sync: false
+      - key: DJANGO_TRUST_PROXY_SSL_HEADER
+        value: "True"
+      - key: DJANGO_NUM_PROXIES         # Vercel + Render
+        value: "2"
+      - key: CLOUDINARY_URL             # cloudinary://API_KEY:API_SECRET@CLOUD_NAME  (Cloudinary dashboard > API Keys)
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET     # optional; leave empty to keep webhooks off
+        sync: false
+      - key: VAPID_PUBLIC_KEY           # optional order alerts: python manage.py generate_vapid_keys
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT              # mailto:you@example.com
+        sync: false

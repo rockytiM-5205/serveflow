@@ -47,6 +47,7 @@ FILTERS = [
     OpenApiParameter("payment_status", str, description="UNPAID, CLAIMED (customer says paid) or PAID"),
     OpenApiParameter("fulfilment_type", str, description="PICKUP or DINE_IN"),
     OpenApiParameter("business_date", str, description="YYYY-MM-DD in the restaurant's timezone"),
+    OpenApiParameter("customer_type", str, description="GUEST (ordered without an account) or ACCOUNT (signed-in customer)"),
     OpenApiParameter("code", int, description="Order code, e.g. 42 for #042"),
     OpenApiParameter("queue", int, description="1 = orders that still need attention: open, completed but unpaid, or with a late fee to collect"),
 ]
@@ -71,6 +72,11 @@ class OrderListView(RestaurantScopedMixin, ListAPIView):
             queryset = queryset.filter(payment_status=params["payment_status"])
         if params.get("fulfilment_type") in ("PICKUP", "DINE_IN"):
             queryset = queryset.filter(fulfilment_type=params["fulfilment_type"])
+        customer_type = params.get("customer_type", "").upper()
+        if customer_type == "GUEST":
+            queryset = queryset.filter(customer__isnull=True)
+        elif customer_type == "ACCOUNT":
+            queryset = queryset.filter(customer__isnull=False)
         try:
             if params.get("business_date"):
                 queryset = queryset.filter(business_date=date.fromisoformat(params["business_date"]))

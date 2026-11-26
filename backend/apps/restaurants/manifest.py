@@ -19,7 +19,7 @@ def build_manifest(restaurant):
     start = f"{CUSTOMER_APP}index.html?r={restaurant.slug}"
     icons = list(DEFAULT_ICONS)
     logo = media_url(restaurant.logo) or ""
-    if logo.startswith("/"):  # the restaurant's own uploaded logo goes first; the standard icons stay as the fallback
+    if logo.startswith(("/", "https://")):  # the restaurant's own uploaded logo goes first; the standard icons stay as the fallback
         icons.insert(0, {"src": logo, "sizes": "512x512", "type": "image/webp", "purpose": "any"})
     return {
         "id": start,

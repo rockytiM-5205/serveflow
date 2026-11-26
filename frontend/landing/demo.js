@@ -7,7 +7,7 @@ const MENU = [
   { name: "Jollof Rice", price: 1000, thumb: 1 }, { name: "Fried Rice", price: 1200, thumb: 2 },
   { name: "Beans & Plantain", price: 900, thumb: 3 }, { name: "Chicken", price: 1000, thumb: 4 },
 ];
-const STATUS = ["Pending", "Confirmed", "Being served", "Served"];
+const STATUS = ["Pending", "Confirmed", "Preparing", "Completed"];
 const SEED = [
   { code: "042", items: "Rice + Chicken", total: 1500, status: 0, type: "Pickup" },
   { code: "043", items: "Beans + Plantain", total: 1200, status: 1, type: "Dine-in" },
@@ -83,7 +83,7 @@ function dashboard({ wide }) {
       el("ul", {}, ...["Overview", "Orders", "Menu", "Settings", "Team"].map((t) => el("li", { class: t === "Orders" ? "on" : "" }, t)))),
     el("div", { class: "dash__main" },
       el("div", { class: "dash__head" }, el("strong", {}, "Incoming orders"), el("span", { class: "dash__live" }, el("i"), "Live")),
-      stats ? el("div", { class: "dash__stats" }, el("div", { class: "dash__stat" }, el("small", {}, "Open orders"), stats.open), el("div", { class: "dash__stat" }, el("small", {}, "Served today"), stats.served), el("div", { class: "dash__stat" }, el("small", {}, "Sales so far"), stats.sales)) : null,
+      stats ? el("div", { class: "dash__stats" }, el("div", { class: "dash__stat" }, el("small", {}, "Open orders"), stats.open), el("div", { class: "dash__stat" }, el("small", {}, "Completed today"), stats.served), el("div", { class: "dash__stat" }, el("small", {}, "Sales so far"), stats.sales)) : null,
       el("div", { class: "dash__chips" }, el("span", { class: "on" }, "Needs attention", counts.attention), el("span", {}, "In progress", counts.progress), el("span", {}, "Finished", counts.finished)),
       head, body));
   return { node, add, setStatus, oldestOpen, seed: () => SEED.forEach((o) => add({ ...o })) };

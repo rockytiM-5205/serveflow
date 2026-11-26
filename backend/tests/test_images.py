@@ -181,3 +181,32 @@ def test_uploaded_pictures_are_served_in_development_even_without_debug(settings
     assert response.status_code == 200 and b"".join(response.streaming_content) == b"RIFFxxxxWEBP"
     escape = pattern.resolve("media/../secret.txt")
     assert escape is None or escape.func(RequestFactory().get("/media/../secret.txt"), **escape.kwargs).status_code == 404
+
+
+def test_cloudinary_storage_maps_names_to_public_ids_and_https_urls(monkeypatch):
+    cloudinary = pytest.importorskip("cloudinary")
+    import cloudinary.api
+    import cloudinary.uploader
+    from cloudinary.exceptions import NotFound
+
+    from apps.common.storage import CloudinaryMediaStorage
+
+    calls = {}
+    monkeypatch.setattr(cloudinary.uploader, "upload", lambda data, **kw: calls.setdefault("upload", (data, kw)))
+    monkeypatch.setattr(cloudinary.uploader, "destroy", lambda public_id, **kw: calls.setdefault("destroy", public_id))
+    storage = CloudinaryMediaStorage()
+    cloudinary.config(cloud_name="democloud", secure=True)
+
+    from django.core.files.base import ContentFile
+    name = storage.save("restaurants/3/logo/abc123.webp", ContentFile(b"picture"))
+    assert name == "restaurants/3/logo/abc123.webp"  # no renaming, no extra API call to find a free name
+    data, kw = calls["upload"]
+    assert data == b"picture" and kw["public_id"] == "restaurants/3/logo/abc123" and kw["resource_type"] == "image"
+    assert storage.url(name) == "https://res.cloudinary.com/democloud/image/upload/restaurants/3/logo/abc123.webp"
+    storage.delete(name)
+    assert calls["destroy"] == "restaurants/3/logo/abc123"
+
+    def missing(public_id, **kw):
+        raise NotFound("not there")
+    monkeypatch.setattr(cloudinary.api, "resource", missing)
+    assert storage.exists(name) is False

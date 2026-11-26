@@ -216,3 +216,18 @@ def test_deleting_an_account_keeps_the_restaurants_orders(api_client, place, sho
     User.objects.get(email="ada@example.com").delete()
     order = Order.objects.get()
     assert order.customer_id is None  # the restaurant's record survives; it just no longer belongs to an account
+
+
+def test_staff_see_guest_and_account_orders_apart_and_can_filter(api_client, place, shop, staff_login):
+    place_as(api_client, place, shop, phone="+442079460010")  # a guest
+    register(api_client)
+    member_order = place_as(api_client, place, shop, phone="+442079460011")  # signed in
+    staff = APIClient()
+    staff.force_login(staff_login(shop.restaurant))
+    list_url = reverse("staff-orders", kwargs={"slug": shop.restaurant.slug})
+    rows = staff.get(list_url).json()["results"]
+    assert sorted(r["customer_type"] for r in rows) == ["ACCOUNT", "GUEST"]
+    guests = staff.get(list_url, {"customer_type": "guest"}).json()["results"]
+    accounts = staff.get(list_url, {"customer_type": "ACCOUNT"}).json()["results"]
+    assert [r["customer_type"] for r in guests] == ["GUEST"]
+    assert [r["reference"] for r in accounts] == [member_order["reference"]]

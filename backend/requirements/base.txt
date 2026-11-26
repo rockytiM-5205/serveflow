@@ -10,3 +10,6 @@ psycopg[binary]>=3.2,<4         # PostgreSQL driver (psycopg 3)
 django-environ>=0.12,<1         # .env loading
 pywebpush>=2.0,<3                # order alerts on staff devices (Web Push); alerts stay off if it isn't installed
 Pillow>=11,<13                  # image uploads (restaurant pictures, menu photos): checked and re-encoded on upload
+gunicorn>=23,<24                # production web server (Render)
+whitenoise>=6.7,<7              # serves Django admin and API-docs static files in production
+cloudinary>=1.41,<2             # stores uploaded pictures in production (only used when CLOUDINARY_URL is set)

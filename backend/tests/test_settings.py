@@ -57,3 +57,8 @@ def test_login_throttle_rates_are_set(settings):
 
 def test_admin_url_is_normalised(settings):
     assert settings.ADMIN_URL.endswith("/") and not settings.ADMIN_URL.startswith("/")
+
+
+def test_healthz_answers_without_a_database(client):
+    response = client.get("/healthz")
+    assert response.status_code == 200 and response.content == b"ok"

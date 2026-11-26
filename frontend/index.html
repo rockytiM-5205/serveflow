@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Online ordering for restaurants. Customers order from their phone, you see every order on one live screen. No app to install.">
+  <meta name="description" content="Dine-in and scheduled pickup ordering for restaurants. Customers order from their phone; your team manages every order on one live screen. No app to install.">
   <meta name="theme-color" content="#064e3b">
-  <title>ServeFlow: online ordering for restaurants</title>
+  <title>ServeFlow: dine-in and pickup ordering for restaurants</title>
   <link rel="stylesheet" href="shared/css/fonts.css">
   <link rel="stylesheet" href="shared/css/tokens.css">
   <link rel="stylesheet" href="shared/css/base.css">
@@ -15,6 +15,7 @@
   <script type="module" src="landing/pricing.js"></script>
   <script type="module" src="landing/showcase.js"></script>
   <script type="module" src="landing/banner.js"></script>
+  <script type="module" src="landing/screenshots.js"></script>
 </head>
 <body class="landing">
   <!-- Logo, defined once and reused -->
@@ -40,14 +41,15 @@
       <nav id="site-nav" class="site-nav" aria-label="Main">
         <ul class="site-nav__links">
           <li><a href="#top" aria-current="true">Home</a></li>
-          <li><a href="#features">Features</a></li>
+          <li><a href="#ordering">For restaurants</a></li>
           <li><a href="#how">How it works</a></li>
+          <li><a href="customer/marketplace.html">For customers</a></li>
+          <li><a href="/api/v1/docs/">Developers</a></li>
           <li><a href="#pricing">Pricing</a></li>
-          <li><a href="customer/marketplace.html">Find restaurants</a></li>
         </ul>
         <div class="site-nav__actions">
-          <a class="btn-outline" href="restaurant-dashboard/login.html">Sign in</a>
-          <a class="btn-mint" href="#pricing">Get started</a>
+          <a class="btn-outline btn-outline--dark" href="restaurant-dashboard/login.html">Sign in</a>
+          <a class="btn-dark" href="#pricing">Get started <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
         </div>
       </nav>
     </div>
@@ -58,26 +60,85 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="wrap hero__inner">
         <div class="hero__copy">
-          <p class="eyebrow">Fast. Simple. Built for restaurants.</p>
-          <h1 id="hero-title">Online ordering for your restaurant: <span class="hl">take, track and serve orders faster</span></h1>
-          <p class="lead">Customers order from their own phone, pay by bank transfer, and follow their order. Your team sees every order on one live screen. No app to install, and no special equipment.</p>
+          <p class="eyebrow">Restaurant ordering &amp; operations platform</p>
+          <h1 id="hero-title">Your restaurant. Your orders. <span class="hl">One smooth flow.</span></h1>
+          <p class="lead">Give customers an easier way to order, while your team manages every order, payment and service from one place. Dine-in and scheduled pickup, with no app to install.</p>
           <div class="hero__cta">
-            <a class="btn-mint btn-lg" href="#pricing">Get started <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
-            <a class="btn-outline btn-lg" href="#how">See how it works</a>
+            <a class="btn-dark btn-lg" href="#pricing">Start your free trial <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
+            <a class="btn-outline btn-outline--dark btn-lg" href="#demo"><span class="play" aria-hidden="true"></span>Watch demo</a>
           </div>
           <ul class="hero__facts">
-            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-bolt"/></svg><span>Orders from<br>any phone</span></li>
-            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-users"/></svg><span>One live<br>order queue</span></li>
-            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-chart"/></svg><span>Status customers<br>can follow</span></li>
-            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-smile"/></svg><span>A menu you<br>control</span></li>
+            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-check"/></svg><span>Free trial, no card needed</span></li>
+            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-check"/></svg><span>Customers pay by bank transfer</span></li>
+            <li><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-check"/></svg><span>Works in any browser</span></li>
           </ul>
+          <p class="hero__audience">Hungry? <a href="customer/marketplace.html">Find a restaurant</a> <span aria-hidden="true">·</span> Building an integration? <a href="/api/v1/docs/">Read the developer docs</a></p>
         </div>
+        <div class="hero__visual">
+          <img data-optional src="landing/assets/hero-food.webp" alt="A plate of jollof rice with grilled chicken, salad and pepper sauce" width="960" height="578" fetchpriority="high" decoding="async">
+        </div>
+      </div>
+    </section>
 
-        <!-- Live product demo: drawn by landing/demo.js. Sample content only. -->
+    <!-- ================= Three things at a glance ================= -->
+    <section class="topics" aria-label="What ServeFlow does">
+      <div class="wrap topics__inner">
+        <a class="topic" href="#ordering">
+          <span class="topic__top"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-utensils"/></svg></span><span><strong>Dine-in ordering</strong><small>Order and enjoy your meal at the restaurant.</small></span><span class="topic__go"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></span></span>
+          <img data-optional src="landing/assets/dine-in.webp" alt="A busy restaurant dining room with set tables" width="588" height="327" loading="lazy" decoding="async">
+        </a>
+        <a class="topic" href="#ordering">
+          <span class="topic__top"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-calendar"/></svg></span><span><strong>Scheduled pickup</strong><small>Choose a time, pay, and collect when it is ready.</small></span><span class="topic__go"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></span></span>
+          <img data-optional src="landing/assets/pickup.webp" alt="A paper takeaway bag on a restaurant counter" width="740" height="492" loading="lazy" decoding="async">
+        </a>
+        <a class="topic" href="#features">
+          <span class="topic__top"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-list"/></svg></span><span><strong>Restaurant management</strong><small>Manage orders, payments and your menu in one place.</small></span><span class="topic__go"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></span></span>
+          <img data-optional src="landing/assets/team.webp" alt="Four smiling restaurant staff in matching aprons" width="735" height="417" loading="lazy" decoding="async">
+        </a>
+      </div>
+    </section>
+
+    <!-- ================= Ordering for customers, control for owners ================= -->
+    <section class="ordering" id="ordering" aria-labelledby="ordering-title">
+      <div class="wrap ordering__inner">
+        <div class="section-head section-head--center">
+          <p class="pill"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-bolt"/></svg>Ordering made simple</p>
+          <h2 id="ordering-title">A better ordering experience for every customer</h2>
+          <p>Turn on dine-in, pickup or both in Settings. Customers choose how they want to enjoy their meal.</p>
+        </div>
+        <div class="tiles">
+          <article class="tile">
+            <div class="tile__text"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-utensils"/></svg></span><h3>Dine-in</h3><p>Order from your phone while you sit. If the restaurant asks for table numbers, add yours at checkout.</p></div>
+            <img data-optional src="landing/assets/dine-in-guests.webp" alt="A couple standing in a bright restaurant" width="588" height="330" loading="lazy" decoding="async">
+          </article>
+          <article class="tile">
+            <div class="tile__text"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-calendar"/></svg></span><h3>Scheduled pickup</h3><p>Pick a collection time from 30 minutes ahead and pay by bank transfer. Follow your order until it is ready.</p></div>
+            <img data-optional src="landing/assets/pickup.webp" alt="A paper takeaway bag ready for collection" width="740" height="492" loading="lazy" decoding="async">
+          </article>
+          <article class="tile">
+            <div class="tile__text"><span class="topic__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-pencil"/></svg></span><h3>Special requests</h3><p>Add a note to your order, such as no pepper or extra sauce. The restaurant sees it on the order.</p></div>
+            <img class="tile__cutout" data-optional src="landing/assets/hero-food.webp" alt="A plate of jollof rice with grilled chicken" width="960" height="578" loading="lazy" decoding="async">
+          </article>
+          <article class="tile tile--owners">
+            <p class="pill pill--dark"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-store"/></svg>For restaurant owners</p>
+            <h3>Run every order from one live screen</h3>
+            <p>Confirm payments, move orders from pending to completed, and keep your whole team in sync.</p>
+            <a class="btn-mint" href="#pricing">See the plans <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Demo (sample content, drawn by landing/demo.js) ================= -->
+    <section class="demo" id="demo" aria-labelledby="demo-title">
+      <div class="wrap demo__inner">
+        <div class="demo__copy">
+          <p class="kicker kicker--light">See it working</p>
+          <h2 id="demo-title">Watch an order travel from a phone to your counter</h2>
+          <p>A customer orders, the order lands on your screen within seconds, and your team moves it along. The demo uses sample orders.</p>
+        </div>
         <div class="hero__demo">
-          <div class="mock" id="hero-demo">
-            <img class="mock__food" data-optional src="landing/assets/hero-food.png" alt="" width="640" height="640" decoding="async">
-          </div>
+          <div class="mock" id="hero-demo"></div>
           <p class="mock__caption" id="hero-caption"><span>Sample orders, for illustration</span></p>
         </div>
       </div>
@@ -88,14 +149,14 @@
       <div class="wrap how__inner">
         <div class="how__intro">
           <p class="kicker">How it works</p>
-          <h2 id="how-title">From order to serving, in a few steps</h2>
+          <h2 id="how-title">From order to serving, in three steps</h2>
           <p>ServeFlow keeps ordering and serving simple, so you can focus on what matters most: great food.</p>
         </div>
         <ol class="how__steps">
           <li class="step">
             <span class="step__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-phone"/></svg></span>
             <h3><span>1.</span> Customers order</h3>
-            <p>Customers open your link or scan your QR code, choose from your menu and place an order from their phone. No app to install, no account to make.</p>
+            <p>Customers open your link or scan your QR code, choose from your menu, pick dine-in or pickup and place the order from their phone. No app to install, and no account needed.</p>
           </li>
           <li class="step">
             <span class="step__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-list"/></svg></span>
@@ -104,8 +165,8 @@
           </li>
           <li class="step">
             <span class="step__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-utensils"/></svg></span>
-            <h3><span>3.</span> Customers collect</h3>
-            <p>Customers follow their order on their own phone and come when it is ready. You see who is waiting and who has paid.</p>
+            <h3><span>3.</span> Customers are served</h3>
+            <p>Customers follow their order on their own phone. Pickup customers come at the time they chose, and dine-in guests are served at their table. You see who is waiting and who has paid.</p>
           </li>
         </ol>
       </div>
@@ -130,6 +191,41 @@
       </div>
     </section>
 
+    <!-- ================= Inside the product: real screenshots, shown only once the image files exist (see landing/assets/README.md) ================= -->
+    <section class="shots" id="product" aria-labelledby="shots-title" hidden>
+      <div class="wrap shots__inner">
+        <div class="section-head">
+          <p class="kicker">Inside ServeFlow</p>
+          <h2 id="shots-title">What your customers and your team see</h2>
+        </div>
+        <div class="shots__grid">
+          <figure class="shot" data-shot="landing/assets/screens/customer-menu.png" data-alt="The customer menu on a phone, with photos, prices and a cart at the bottom" hidden><figcaption>Customers browse your menu and order from their phone.</figcaption></figure>
+          <figure class="shot" data-shot="landing/assets/screens/orders-queue.png" data-alt="The restaurant dashboard's live orders queue" hidden><figcaption>Your team works from one live queue.</figcaption></figure>
+          <figure class="shot" data-shot="landing/assets/screens/payments-to-check.png" data-alt="The Payments to check screen, where several bank transfers are confirmed at once" hidden><figcaption>Confirm many bank transfers at once.</figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Built for restaurants ================= -->
+    <section class="why" id="features" aria-labelledby="why-title">
+      <div class="wrap trust__inner">
+        <div class="trust__copy">
+          <p class="pill"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-bolt"/></svg>Why choose ServeFlow</p>
+          <h2 id="why-title">Built for restaurants. Easy for customers.</h2>
+          <p>A platform that works whether you are running the counter or ordering lunch. Less waiting, fewer mistakes, calmer service.</p>
+          <ul class="trust">
+            <li class="trust-item"><span class="trust-item__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-shield"/></svg></span><strong>Separate and secure</strong><span>Every restaurant's menu, orders and team are kept apart, with roles for owners, managers and staff.</span></li>
+            <li class="trust-item"><span class="trust-item__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-bolt"/></svg></span><strong>Live in seconds</strong><span>New orders reach your dashboard within seconds, with no refresh.</span></li>
+            <li class="trust-item"><span class="trust-item__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-check"/></svg></span><strong>Prices you can trust</strong><span>Totals are worked out on the server from your menu, never from the customer's phone.</span></li>
+            <li class="trust-item"><span class="trust-item__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-map-pin"/></svg></span><strong>Get discovered</strong><span>List your restaurant in the ServeFlow marketplace when you are ready.</span></li>
+          </ul>
+        </div>
+        <figure class="trust__photo">
+          <img data-optional src="landing/assets/team.webp" alt="Four smiling restaurant staff in matching aprons" width="735" height="417" loading="lazy" decoding="async">
+        </figure>
+      </div>
+    </section>
+
     <!-- ================= Pricing (plans are published by ServeFlow; nothing is written here) ================= -->
     <section class="pricing" id="pricing" aria-labelledby="pricing-title">
       <div class="wrap pricing__inner">
@@ -138,30 +234,12 @@
           <h2 id="pricing-title">Choose a plan, then try it</h2>
           <p id="pricing-note">Try it free first, then pay by bank transfer. No card needed to start.</p>
         </div>
-        <div class="plans" id="plans" aria-live="polite"><p class="plans__status">Loading plans…</p></div>
+        <div class="plans" id="plans" aria-live="polite" aria-busy="true">
+          <div class="plan-card plan-card--skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="plan-card plan-card--skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <p class="sr-only">Loading plans…</p>
+        </div>
         <p class="pricing__more"><a href="pricing/index.html">How paying works</a></p>
-      </div>
-    </section>
-
-    <!-- ================= Why ================= -->
-    <section class="why" id="features" aria-labelledby="why-title">
-      <div class="wrap why__inner">
-        <div class="why__intro">
-          <p class="kicker">Why restaurants choose ServeFlow</p>
-          <h2 id="why-title">Built for real restaurant challenges</h2>
-          <p>We understand the daily pressure of a busy service. ServeFlow helps you work faster and calmer, without adding complexity.</p>
-          <a class="btn-dark" href="#pricing">See the plans <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
-        </div>
-        <div class="why__cards">
-          <article class="feature"><span class="feature__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-clock"/></svg></span><h3>Fewer people waiting</h3><p>Customers can order from their seat or before they arrive, so your counter stays clear.</p></article>
-          <article class="feature"><span class="feature__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-refresh"/></svg></span><h3>One live queue</h3><p>Your whole team sees the same orders. The queue refreshes every few seconds, with no reload.</p></article>
-          <article class="feature"><span class="feature__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-check"/></svg></span><h3>Prices you can trust</h3><p>Totals are worked out on the server from your menu, never from the customer's phone.</p></article>
-          <article class="feature"><span class="feature__icon"><svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-shield"/></svg></span><h3>Your data stays yours</h3><p>Every restaurant's menu, orders and team are kept apart, with roles for owners, managers and staff.</p></article>
-        </div>
-        <figure class="photo">
-          <img data-optional src="landing/assets/team.jpg" alt="A restaurant team member taking an order on a tablet" loading="lazy" decoding="async" width="720" height="900">
-          <figcaption class="photo__quote">Less stress.<br>More service.</figcaption>
-        </figure>
       </div>
     </section>
 
@@ -187,27 +265,36 @@
 
     <!-- ================= Closing call to action ================= -->
     <section class="cta" aria-labelledby="cta-title">
-      <div class="wrap cta__inner">
-        <a class="logo logo--dark" href="#top" aria-label="ServeFlow home">
-          <svg class="logo__mark" aria-hidden="true"><use href="#logo"/></svg><span class="logo__name">ServeFlow</span>
-        </a>
-        <div class="cta__text">
-          <h2 id="cta-title">Ready to streamline your restaurant operations?</h2>
-          <p>Create your restaurant in a few minutes and see how ServeFlow fits your service.</p>
+      <div class="wrap">
+        <div class="cta__inner">
+          <a class="logo" href="#top" aria-label="ServeFlow home">
+            <svg class="logo__mark" aria-hidden="true"><use href="#logo"/></svg><span class="logo__name">ServeFlow</span>
+          </a>
+          <div class="cta__text">
+            <h2 id="cta-title">Ready to get started?</h2>
+            <p>Create your restaurant in a few minutes and see how ServeFlow fits your service.</p>
+          </div>
+          <a class="btn-mint btn-lg" href="#pricing">Get started <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
         </div>
-        <a class="btn-dark btn-lg" href="#pricing">Get started <svg class="icon" aria-hidden="true"><use href="shared/assets/icons.svg#i-arrow-right"/></svg></a>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
     <div class="wrap site-footer__inner">
-      <p>© <span id="year">2026</span> ServeFlow. All rights reserved.</p>
+      <div class="site-footer__brand">
+        <a class="logo logo--dark" href="#top" aria-label="ServeFlow home"><svg class="logo__mark" aria-hidden="true"><use href="#logo"/></svg><span class="logo__name">ServeFlow</span></a>
+        <p>One smooth flow.</p>
+      </div>
       <ul>
-        <li><a href="customer/marketplace.html">Find restaurants</a></li>
-        <li><a href="/api/v1/docs/">For developers</a></li>
+        <li><a href="#top">Home</a></li>
+        <li><a href="#ordering">For restaurants</a></li>
+        <li><a href="customer/marketplace.html">For customers</a></li>
+        <li><a href="/api/v1/docs/">Developers</a></li>
+        <li><a href="#pricing">Pricing</a></li>
         <li><a href="restaurant-dashboard/login.html">Sign in</a></li>
       </ul>
+      <p class="site-footer__legal">© <span id="year">2026</span> ServeFlow. All rights reserved.</p>
     </div>
   </footer>
   <aside class="promo" id="promo" role="region" aria-label="Free trial offer" hidden>

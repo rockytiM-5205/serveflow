@@ -28,7 +28,7 @@ document.querySelectorAll("img[data-optional]").forEach((img) => {
 });
 
 // Gentle reveal as sections scroll into view. Skipped for people who ask for reduced motion, and nothing is hidden without JS.
-const REVEAL = ".how__intro, .step, .why__intro, .feature, .photo, .rush__intro, .facts li, .rush__api, .cta__inner, .pricing__intro, .plan-card";
+const REVEAL = ".how__intro, .step, .why__intro, .feature, .photo, .rush__intro, .facts li, .rush__api, .cta__inner, .pricing__intro, .plan-card:not(.plan-card--skeleton), .section-head, .topic, .tile, .trust-item, .trust__photo, .shot, .demo__copy";
 const motionOk = !matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window;
 const revealer = motionOk ? new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
@@ -62,7 +62,7 @@ const spy = new IntersectionObserver((entries) => {
     links.forEach((link, id) => link.setAttribute("aria-current", String(id === current)));
   });
 }, { rootMargin: "-40% 0px -55% 0px" });
-["top", "features", "how"].forEach((id) => {
+["top", "ordering", "how", "features", "pricing"].forEach((id) => {
   const target = id === "top" ? document.querySelector(".hero") : document.getElementById(id);
   if (target) {
     target.dataset.spyId = id;

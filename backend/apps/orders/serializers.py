@@ -241,16 +241,21 @@ class StaffOrderListSerializer(serializers.ModelSerializer):
     items = StaffOrderItemSerializer(many=True, read_only=True)
     refund_due = serializers.SerializerMethodField()
     late_free_until = serializers.SerializerMethodField()
+    customer_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = (
-            "public_id", "code", "reference", "source", "business_date", "status", "payment_status", "payment_claimed_at",
+            "public_id", "code", "reference", "source", "customer_type", "business_date", "status", "payment_status", "payment_claimed_at",
             "refund_due", "fulfilment_type", "table_number", "pickup_at", "pickup_fee", "late_fee", "late_fee_status",
             "late_free_until", "customer_name", "items", "total",
             "currency", "ready_at", "completed_at", "created_at", "updated_at",
         )
         read_only_fields = fields
+
+    def get_customer_type(self, order) -> str:
+        """GUEST when the order was placed without a ServeFlow account (and never added to one), otherwise ACCOUNT."""
+        return "ACCOUNT" if order.customer_id else "GUEST"
 
     def get_late_free_until(self, order) -> str | None:
         until = lateness.free_until(order)

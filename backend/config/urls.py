@@ -3,12 +3,18 @@ import re
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path, re_path
 from django.views.static import serve
 from apps.restaurants.views import RestaurantCreateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 handler404 = "apps.common.views.not_found"
+
+
+def healthz(request):
+    """Always answers 200 without touching the database. Used by the host's health check and uptime monitors."""
+    return HttpResponse("ok", content_type="text/plain")
 
 
 def media_urlpatterns():
@@ -22,6 +28,7 @@ def media_urlpatterns():
 
 
 urlpatterns = [
+    path("healthz", healthz, name="healthz"),
     path(settings.ADMIN_URL, admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/platform/", include("apps.platform_admin.urls")),
