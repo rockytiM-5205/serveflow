@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/v1/(.*)",
-      "destination": "https://YOUR-SERVICE.onrender.com/api/v1/$1"
+      "destination": "https://serveflow-6d83.onrender.com/api/v1/$1"
     },
     {
       "source": "/static/(.*)",
-      "destination": "https://YOUR-SERVICE.onrender.com/static/$1"
+      "destination": "https://serveflow-6d83.onrender.com/static/$1"
     }
   ],
   "headers": [
