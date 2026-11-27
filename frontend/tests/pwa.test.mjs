@@ -72,3 +72,13 @@ test("each app has its own manifest, scope and service worker", () => {
     assert.match(readFileSync(new URL(`../${dir}/sw.js`, import.meta.url), "utf8"), /serveflowServiceWorker\(/);
   }
 });
+
+import { sameKey } from "../restaurant-dashboard/js/push-client.js";
+
+test("a subscription made with an older server key is recognised so it can be replaced", () => {
+  const key = "BAUG"; // any valid base64url text
+  const current = keyToBytes(key);
+  assert.equal(sameKey({ options: { applicationServerKey: current.buffer } }, key), true);
+  assert.equal(sameKey({ options: { applicationServerKey: new Uint8Array([1, 2, 3]).buffer } }, key), false);
+  assert.equal(sameKey({ options: {} }, key), true); // the browser doesn't say: keep what works
+});

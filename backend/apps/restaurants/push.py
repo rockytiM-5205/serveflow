@@ -59,6 +59,7 @@ def _deliver(subscription, payload):
         webpush(
             subscription_info={"endpoint": subscription.endpoint, "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth}},
             data=json.dumps(payload), vapid_private_key=settings.VAPID_PRIVATE_KEY, vapid_claims={"sub": settings.VAPID_SUBJECT}, ttl=3600,
+            headers={"Urgency": "high"},  # new orders must wake a phone that is resting, not wait for it to wake up on its own
         )
     except WebPushException as exc:
         status = getattr(getattr(exc, "response", None), "status_code", None)

@@ -148,7 +148,9 @@ async function main() {
         }));
         const off = el("button", { class: "btn btn--ghost btn--sm", type: "button" }, "Turn off");
         off.addEventListener("click", act(off, async () => { await turnOff({ api, base: pushBase }); toast("Alerts are off on this device.", { type: "success" }); }));
-        rows.push(el("p", {}, el("strong", {}, "On for this device. "), "You will get a message for every new order, even when ServeFlow isn't open."), el("div", { class: "row" }, test, off));
+        rows.push(el("p", {}, el("strong", {}, "On for this device. "), "You will get a message for every new order, even when ServeFlow isn't open."),
+          el("p", { class: "muted" }, "If alerts stop after you close the app: in your phone's Settings, allow notifications for your browser (or the ServeFlow app) and set its battery use to Unrestricted. Some phones also need Autostart switched on."),
+          el("div", { class: "row" }, test, off));
       } else {
         const turn = el("button", { class: "btn btn--primary", type: "button" }, icon("bell"), "Turn on alerts on this device");
         turn.addEventListener("click", act(turn, async () => {

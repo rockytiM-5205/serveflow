@@ -6,6 +6,7 @@ import { closeOnBackdrop, el, emptyState, icon, setBusy, toast } from "../../sha
 import { SUBSCRIPTION_ENDED_EVENT, subscriptionEndedBanner } from "../../shared/js/subscription.js";
 import { formDialog } from "./form-dialog.js";
 import { showPlanBanner } from "./plan-banner.js";
+import { syncDevice } from "./push-client.js";
 import { ROLE_LABEL, displayName, hasRole, pickMembership } from "./session.js";
 
 const STORAGE_KEY = "serveflow.restaurant"; // the chosen restaurant slug only; never credentials
@@ -222,6 +223,7 @@ export async function bootDashboard({ href, minRole = "STAFF" }) {
 
   const membership = pickMembership(memberships, readStoredSlug());
   storeSlug(membership.restaurant.slug);
+  syncDevice({ api, base: `/restaurants/${encodeURIComponent(membership.restaurant.slug)}` }); // keeps order alerts working; never blocks the page
 
   const sheet = buildAccountSheet(session, memberships, membership);
   renderNav(document.getElementById("nav"), href, membership.role, () => sheet.showModal(), membership.restaurant);

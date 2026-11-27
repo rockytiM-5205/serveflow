@@ -55,6 +55,8 @@ function serveflowServiceWorker({ name, push = false }) {
       badge: "/shared/assets/icons/badge-96.png",
       tag: String(data.tag || "serveflow"),
       renotify: true,
+      requireInteraction: true, // a new order stays on screen until someone taps it
+      vibrate: [200, 100, 200],
       data: { url: typeof data.url === "string" && data.url.startsWith("/restaurant-dashboard/") ? data.url : "/restaurant-dashboard/orders.html" },
     }));
   });
