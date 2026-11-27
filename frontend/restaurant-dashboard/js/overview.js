@@ -48,7 +48,8 @@ if (ctx) {
     });
     return notice.replaceChildren(el("div", { class: "alert alert--warning", role: "status" },
       icon("clock"),
-      el("span", { style: "flex:1" }, "Customers can't place orders yet because orders are switched off. Add your menu, then turn them on."),
+      el("span", { style: "flex:1" }, "Customers can't place orders yet. To start: add your menu items, add your bank details in Settings (customers pay before you prepare their order), then turn orders on."),
+      el("a", { class: "btn btn--secondary btn--sm", href: "settings.html" }, "Bank details"),
       turnOn));
   }
 

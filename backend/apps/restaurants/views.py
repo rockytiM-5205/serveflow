@@ -1,3 +1,5 @@
+import logging
+
 from django.db import IntegrityError, transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -10,6 +12,7 @@ from rest_framework.response import Response
 from apps.common.throttles import ScopedRateThrottle
 
 from apps.audit.services import record
+from apps.common.exceptions import StorageUnavailable
 from apps.common.images import ImageRejected, process_image
 from apps.common.pagination import DefaultCursorPagination
 from apps.common.schema import SLUG_PARAM, staff_schema
@@ -106,6 +109,9 @@ class RestaurantSettingsView(RestaurantScopedMixin, RetrieveUpdateAPIView):
                        "#/customers", restaurant, f"marketplace_review:{restaurant.pk}")
 
 
+log = logging.getLogger(__name__)
+
+
 class RestaurantCreateView(CreateAPIView):
     """Any signed-in user who is allowed to (see can_create_restaurant) can open a restaurant."""
 
@@ -160,18 +166,25 @@ class RestaurantPictureView(RestaurantScopedMixin, GenericAPIView):
         restaurant = request.restaurant
         stored = getattr(restaurant, self.field)
         old = stored.name if stored else None
-        with transaction.atomic():
-            if new_content is None:
-                setattr(restaurant, self.field, None)
-            else:
-                getattr(restaurant, self.field).save(new_content.name, new_content, save=False)
-            restaurant.save(update_fields=[self.field])
-            record(
-                restaurant=restaurant, actor=request.user, action=f"restaurant.{self.kind}_{'removed' if new_content is None else 'changed'}",
-                entity_type="restaurant", entity_id=restaurant.pk, metadata={},
-            )
+        try:
+            with transaction.atomic():
+                if new_content is None:
+                    setattr(restaurant, self.field, None)
+                else:
+                    getattr(restaurant, self.field).save(new_content.name, new_content, save=False)
+                restaurant.save(update_fields=[self.field])
+                record(
+                    restaurant=restaurant, actor=request.user, action=f"restaurant.{self.kind}_{'removed' if new_content is None else 'changed'}",
+                    entity_type="restaurant", entity_id=restaurant.pk, metadata={},
+                )
+        except Exception:  # the picture store (Cloudinary) or the database refused: say so plainly, and keep the traceback in the log
+            log.exception("Saving the restaurant %s picture failed", self.kind)
+            raise StorageUnavailable() from None
         if old:
-            stored.storage.delete(old)  # after the commit, so a failed save never loses the old picture
+            try:
+                stored.storage.delete(old)  # after the commit, so a failed save never loses the old picture
+            except Exception:  # noqa: BLE001 - an orphaned old picture is harmless; the new one is already saved
+                log.warning("Could not delete the old %s picture %s", self.kind, old, exc_info=True)
         return Response(RestaurantSettingsSerializer(restaurant).data)
 
     @extend_schema(parameters=[SLUG_PARAM], request=UPLOAD_BODY, responses=RestaurantSettingsSerializer, summary="Upload the restaurant's picture (manager or owner)")

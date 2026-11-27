@@ -62,3 +62,7 @@ STORAGES = {
 
 if os.environ.get("CLOUDINARY_URL", "").strip():
     STORAGES["default"] = {"BACKEND": "apps.common.storage.CloudinaryMediaStorage"}
+    if "<" in os.environ["CLOUDINARY_URL"] or ">" in os.environ["CLOUDINARY_URL"]:
+        import warnings
+
+        warnings.warn("CLOUDINARY_URL contains < or >. Remove them: it must look like cloudinary://API_KEY:API_SECRET@CLOUD_NAME. Picture uploads will fail until it is fixed.")

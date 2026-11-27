@@ -210,3 +210,19 @@ def test_cloudinary_storage_maps_names_to_public_ids_and_https_urls(monkeypatch)
         raise NotFound("not there")
     monkeypatch.setattr(cloudinary.api, "resource", missing)
     assert storage.exists(name) is False
+
+
+def test_a_failing_picture_store_gives_a_clear_503_not_a_server_error(api_client, setup, media, monkeypatch):
+    from django.db.models.fields.files import FieldFile
+
+    def refuse(self, *args, **kwargs):
+        raise RuntimeError("picture store unreachable")
+
+    monkeypatch.setattr(FieldFile, "save", refuse)
+    restaurant, item, users = setup
+    api_client.force_login(users[MembershipRole.MANAGER])
+    for url in (reverse("restaurant-logo", kwargs={"slug": restaurant.slug}), item_url(restaurant, item)):
+        response = post(api_client, url, upload(picture()))
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "storage_unavailable"
+        assert "try again" in response.json()["error"]["message"]

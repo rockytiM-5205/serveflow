@@ -27,13 +27,28 @@ function readCookie(name) {
   return null;
 }
 
+/** The first human-readable sentence inside a validation error's details (a string, a list of strings, or fields holding those). */
+function firstDetail(details) {
+  if (typeof details === "string") return details;
+  if (Array.isArray(details)) {
+    for (const item of details) { const found = firstDetail(item); if (found) return found; }
+    return "";
+  }
+  if (details && typeof details === "object") {
+    for (const value of Object.values(details)) { const found = firstDetail(value); if (found) return found; }
+  }
+  return "";
+}
+
 function errorFrom(response, data) {
   const envelope = data && typeof data === "object" ? data.error : null;
   const retry = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
+  // "The request was invalid." tells a restaurant nothing; the reason (for example "Add your bank details first") is in the details.
+  const reason = envelope?.code === "validation_error" ? firstDetail(envelope?.details) : "";
   return new ApiError({
     status: response.status,
     code: envelope?.code ?? "http_error",
-    message: envelope?.message ?? `Request failed (${response.status}).`,
+    message: reason || (envelope?.message ?? `Request failed (${response.status}).`),
     details: envelope?.details ?? {},
     retryAfter: Number.isFinite(retry) ? retry : null,
   });
@@ -41,8 +56,8 @@ function errorFrom(response, data) {
 
 /** Reads that fail to connect (or get a 502/503/504 from a busy or restarting server) are tried again quietly before the person
  * sees an error. Only reads: a write is never repeated behind the person's back. Tests set delaysMs to [] to skip the waiting. */
-export const retryPolicy = { delaysMs: [300, 900] };
-const transient = (err) => err instanceof ApiError && (err.code === "network_error" || [502, 503, 504].includes(err.status));
+export const retryPolicy = { delaysMs: [400, 1500, 4000, 8000] }; // long enough for a sleeping free-tier server to wake up
+const transient = (err) => err instanceof ApiError && (err.code === "network_error" || err.code === "timeout" || [502, 503, 504].includes(err.status));
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function request(path, options = {}) {
@@ -110,7 +125,7 @@ async function requestOnce(path, { method = "GET", body, signal, timeoutMs = con
     return data;
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    if (timedOut) throw new ApiError({ code: "timeout", message: "The server took too long to respond." });
+    if (timedOut) throw new ApiError({ code: "timeout", message: "The server is taking a while to respond. Please try again in a moment." });
     if (signal?.aborted) throw err; // the caller cancelled; let them see the AbortError
     throw new ApiError({ code: "network_error", message: "Can't reach the server. Check your connection and try again." });
   } finally {

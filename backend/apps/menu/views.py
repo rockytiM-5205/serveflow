@@ -1,3 +1,5 @@
+import logging
+
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
@@ -10,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.services import record
-from apps.common.exceptions import Conflict
+from apps.common.exceptions import Conflict, StorageUnavailable
 from apps.common.images import ImageRejected, process_image
 from apps.common.schema import SLUG_PARAM, staff_schema
 from apps.restaurants.models import MembershipRole, Restaurant
@@ -144,15 +146,22 @@ class ItemImageView(RestaurantScopedMixin, GenericAPIView):
 
     def _swap(self, item, new_content, action):
         old = item.image.name if item.image else None
-        with transaction.atomic():
-            if new_content is None:
-                item.image = None
-            else:
-                item.image.save(new_content.name, new_content, save=False)
-            item.save(update_fields=["image", "updated_at"])
-            record(restaurant=self.request.restaurant, actor=self.request.user, action=action, entity_type="menu_item", entity_id=item.pk, metadata={"item": item.name})
+        try:
+            with transaction.atomic():
+                if new_content is None:
+                    item.image = None
+                else:
+                    item.image.save(new_content.name, new_content, save=False)
+                item.save(update_fields=["image", "updated_at"])
+                record(restaurant=self.request.restaurant, actor=self.request.user, action=action, entity_type="menu_item", entity_id=item.pk, metadata={"item": item.name})
+        except Exception:  # the picture store (Cloudinary) or the database refused: say so plainly, and keep the traceback in the log
+            logging.getLogger(__name__).exception("Saving a menu photo failed")
+            raise StorageUnavailable() from None
         if old:
-            item.image.storage.delete(old)  # after the commit, so a failed save never loses the old photo
+            try:
+                item.image.storage.delete(old)  # after the commit, so a failed save never loses the old photo
+            except Exception:  # noqa: BLE001 - an orphaned old photo is harmless; the new one is already saved
+                logging.getLogger(__name__).warning("Could not delete the old menu photo %s", old, exc_info=True)
         return Response(self.get_serializer(item).data)
 
     @extend_schema(parameters=[SLUG_PARAM], request=UPLOAD_BODY, responses=ItemSerializer, summary="Upload an item's photo (manager or owner)")

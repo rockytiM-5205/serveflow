@@ -14,6 +14,14 @@ class Conflict(exceptions.APIException):
         self.details = details
 
 
+class StorageUnavailable(exceptions.APIException):
+    """503: the picture could not be saved (the picture store was unreachable or refused it). Safe to try again."""
+
+    status_code = 503
+    default_detail = "We couldn't save the picture right now. Please try again in a moment."
+    default_code = "storage_unavailable"
+
+
 class BadRequest(exceptions.APIException):
     """400 for a malformed request that is not a field validation problem."""
 
@@ -23,6 +31,7 @@ class BadRequest(exceptions.APIException):
 
 
 _CODES = (
+    (StorageUnavailable, "storage_unavailable"),
     (Conflict, "conflict"),
     (BadRequest, "bad_request"),
     (exceptions.NotAuthenticated, "not_authenticated"),

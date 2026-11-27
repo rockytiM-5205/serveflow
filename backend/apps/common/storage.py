@@ -8,6 +8,7 @@ A stored name looks like ``restaurants/3/logo/<random>.webp``. Cloudinary's publ
 address served to browsers is https://res.cloudinary.com/<cloud>/image/upload/restaurants/3/logo/<random>.webp. Names are random per
 upload, so a replaced picture always has a new address and old copies are never served from a stale cache.
 """
+import io
 import os
 
 from django.core.files.storage import Storage
@@ -32,7 +33,7 @@ class CloudinaryMediaStorage(Storage):
 
         content.seek(0)
         cloudinary.uploader.upload(
-            content.read(),
+            io.BytesIO(content.read()),  # a file-like object: the SDK uploads those as a real file (raw bytes are not)
             public_id=self._public_id(name),
             resource_type="image",
             overwrite=True,
