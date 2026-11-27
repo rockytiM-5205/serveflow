@@ -16,6 +16,17 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 # Platform admin lives at a configurable path; set a non-default value in production.
 ADMIN_URL = env.str("DJANGO_ADMIN_URL", default="admin/").strip("/") + "/"
+# The Django admin is a second front door to the platform owner's account. It is ON in development and OFF in production unless
+# DJANGO_ADMIN_ENABLED=True (the Owner Control Centre covers day-to-day work). When on, failed logins are limited (see ADMIN_LOCKOUT_*).
+ADMIN_ENABLED = env.bool("DJANGO_ADMIN_ENABLED", default=True)
+ADMIN_LOCKOUT_FAILURES = 5          # wrong passwords for one username ...
+ADMIN_LOCKOUT_IP_FAILURES = 20      # ... or from one address ...
+ADMIN_LOCKOUT_SECONDS = 15 * 60     # ... within this window lock the admin login for the rest of it
+# How many reverse proxies of ours sit in front of Django (Vercel + Render = 2; Render alone = 1; local development = 0). Used to find
+# the real client address for rate limits. See apps/common/throttles.py and docs/deploy.md.
+TRUSTED_PROXY_COUNT = env.int("DJANGO_NUM_PROXIES", default=0)
+# Extra browser push-service host names allowed for order alerts, beyond the built-in list in apps/restaurants/push.py.
+PUSH_EXTRA_HOSTS = env.list("DJANGO_PUSH_EXTRA_HOSTS", default=[])
 
 # --- Self-service onboarding --------------------------------------------------
 # When on, anyone can create an account and a restaurant from the dashboard (no Django admin
@@ -50,6 +61,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.admin_lockout.AdminLoginLockoutMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -150,9 +162,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.common.exceptions.api_exception_handler",
-    # How many reverse proxies sit in front of Django (Vercel + Render = 2). With 0 the throttles trust the whole
-    # X-Forwarded-For header, which a client can fake; set DJANGO_NUM_PROXIES in production (see docs/deploy.md).
-    "NUM_PROXIES": env.int("DJANGO_NUM_PROXIES", default=0) or None,
     "DEFAULT_THROTTLE_RATES": {
         "login_ip": "5/min",
         "login_email": "5/min",
@@ -166,6 +175,9 @@ REST_FRAMEWORK = {
         "payment_webhook": "300/min",
         "marketplace": "120/min",
         "customer_signup": "20/hour",
+        "signup_global": "200/hour",  # everyone together: a backstop that does not depend on knowing anybody's IP
+        "customer_signup_global": "600/hour",
+        "order_restaurant": "90/min",  # all callers together, per restaurant (about 1.5 orders a second)
     },
 }
 

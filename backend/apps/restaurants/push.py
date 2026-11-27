@@ -5,6 +5,7 @@ A device the browser says is gone (404 or 410) is forgotten. Alerts carry only t
 import json
 import logging
 import threading
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db import connection
@@ -17,6 +18,27 @@ DASHBOARD_ORDERS = "/restaurant-dashboard/orders.html"
 ICON = "/shared/assets/icons/icon-192.png"
 
 
+# Only the push services that browsers use. A device address is a URL the server will POST to, so anything else (an internal host, a
+# stranger's server) would let a signed-in user make this server send requests wherever they like. Add more with the
+# DJANGO_PUSH_EXTRA_HOSTS setting (comma-separated host names) if a browser vendor adds a service.
+PUSH_HOSTS = frozenset({"fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"})
+PUSH_HOST_SUFFIXES = (".push.services.mozilla.com", ".push.apple.com", ".notify.windows.com")
+
+
+def is_push_service(url: str) -> bool:
+    """True only for an https address on a known browser push service: default port, no credentials, no IP address."""
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or parsed.username or parsed.password or port not in (None, 443) or not host:
+        return False
+    extra = {h.strip().lower() for h in getattr(settings, "PUSH_EXTRA_HOSTS", []) if h.strip()}
+    return host in PUSH_HOSTS or host in extra or host.endswith(PUSH_HOST_SUFFIXES)
+
+
 class PushGone(Exception):
     """The browser says this device no longer exists."""
 
@@ -27,6 +49,8 @@ def enabled():
 
 def _deliver(subscription, payload):
     """Send one message to one device. Raises PushGone if the device is gone; other failures raise their own error."""
+    if not is_push_service(subscription.endpoint):
+        raise PushGone()  # never POST to an address that isn't a push service; the stored device is forgotten
     try:
         from pywebpush import WebPushException, webpush
     except ImportError:  # the package isn't installed: alerts stay off rather than breaking orders

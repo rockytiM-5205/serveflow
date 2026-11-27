@@ -7,7 +7,7 @@ from apps.restaurants.models import MembershipRole, PushSubscription
 
 pytestmark = pytest.mark.django_db
 STAFF = MembershipRole.STAFF
-DEVICE = {"endpoint": "https://push.example.com/send/abc123", "p256dh": "BPpublickey", "auth": "authsecret"}
+DEVICE = {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123", "p256dh": "BPpublickey", "auth": "authsecret"}
 
 
 def url(name, shop):
@@ -75,7 +75,7 @@ def test_signed_out_visitors_cannot_subscribe(api_client, shop):
 
 # ---------------------------------------------------------------- sending
 def make_devices(shop, make_user, n=2):
-    return [PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint=f"https://push.example.com/{i}", p256dh="k", auth="a") for i in range(n)]
+    return [PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint=f"https://fcm.googleapis.com/fcm/send/{i}", p256dh="k", auth="a") for i in range(n)]
 
 
 def test_a_device_the_browser_says_is_gone_is_forgotten(shop, make_user, monkeypatch):
@@ -125,7 +125,7 @@ def test_no_thread_is_started_while_alerts_are_off(shop, monkeypatch):
 def test_the_test_alert_goes_only_to_my_devices(api_client, shop, staff_login, make_user, vapid, monkeypatch):
     seen = []
     monkeypatch.setattr(push, "_deliver", lambda subscription, payload: seen.append((subscription.endpoint, payload["title"])))
-    PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint="https://push.example.com/other", p256dh="k", auth="a")
+    PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint="https://fcm.googleapis.com/fcm/send/other", p256dh="k", auth="a")
     staff_login(shop.restaurant, STAFF)
     api_client.post(url("restaurant-push-subscribe", shop), DEVICE, format="json")
     assert api_client.post(url("restaurant-push-test", shop)).json() == {"sent": 1, "enabled": True}
@@ -135,3 +135,42 @@ def test_the_test_alert_goes_only_to_my_devices(api_client, shop, staff_login, m
 def test_the_test_alert_says_so_when_alerts_are_off(api_client, shop, staff_login):
     staff_login(shop.restaurant, STAFF)
     assert api_client.post(url("restaurant-push-test", shop)).json() == {"sent": 0, "enabled": False}
+
+
+@pytest.mark.parametrize("endpoint", [
+    "https://127.0.0.1/send", "https://localhost/send", "https://169.254.169.254/latest", "https://internal.example.com/hook",
+    "https://fcm.googleapis.com.evil.example/send", "https://user:pw@fcm.googleapis.com/send", "https://fcm.googleapis.com:8443/send",
+    "https://evilnotify.windows.com.example/send",
+])
+def test_only_real_browser_push_services_are_accepted(api_client, shop, staff_login, endpoint):
+    staff_login(shop.restaurant)
+    response = api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": endpoint}, format="json")
+    assert response.status_code == 400 and not PushSubscription.objects.filter(endpoint=endpoint).exists()
+
+
+@pytest.mark.parametrize("endpoint", [
+    "https://fcm.googleapis.com/fcm/send/abc", "https://updates.push.services.mozilla.com/wpush/v2/abc",
+    "https://web.push.apple.com/abc", "https://db5p.notify.windows.com/w/?token=abc",
+])
+def test_real_browser_push_services_are_accepted(api_client, shop, staff_login, endpoint):
+    staff_login(shop.restaurant)
+    assert api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": endpoint}, format="json").status_code == 200
+
+
+def test_a_stored_device_with_a_non_push_address_is_never_contacted_and_is_forgotten(shop, make_user, monkeypatch):
+    from apps.restaurants import push
+
+    bad = PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint="https://internal.example.com/x", p256dh="k", auth="a")
+    sent = []
+    monkeypatch.setattr(push, "webpush", lambda **kw: sent.append(kw), raising=False)
+    push.send_to([bad], {"title": "t"})
+    assert sent == [] and not PushSubscription.objects.filter(pk=bad.pk).exists()
+
+
+def test_one_person_cannot_register_an_unlimited_number_of_devices(api_client, shop, staff_login):
+    from apps.restaurants.push_views import MAX_DEVICES
+
+    staff_login(shop.restaurant)
+    for i in range(MAX_DEVICES):
+        assert api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": f"https://fcm.googleapis.com/fcm/send/{i}"}, format="json").status_code == 200
+    assert api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": "https://fcm.googleapis.com/fcm/send/extra"}, format="json").status_code == 400

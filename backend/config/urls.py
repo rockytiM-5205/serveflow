@@ -29,7 +29,6 @@ def media_urlpatterns():
 
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
-    path(settings.ADMIN_URL, admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/platform/", include("apps.platform_admin.urls")),
     path("api/v1/restaurants/", RestaurantCreateView.as_view(), name="restaurant-create"),
@@ -52,5 +51,8 @@ urlpatterns = [
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]
+
+if settings.ADMIN_ENABLED:  # off by default in production (config/settings/production.py)
+    urlpatterns.insert(1, path(settings.ADMIN_URL, admin.site.urls))
 
 urlpatterns += media_urlpatterns()

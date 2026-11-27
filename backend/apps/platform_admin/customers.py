@@ -103,6 +103,18 @@ def reset_admin_password(restaurant, actor):
     return password
 
 
+def set_marketplace_approval(restaurant, actor, approved):
+    """Allow (or stop allowing) a restaurant to appear in the marketplace. Only the platform owner can; the restaurant's own switch
+    does nothing until this is on. Recorded in the platform audit log."""
+    with transaction.atomic():
+        locked = Restaurant.objects.select_for_update().get(pk=restaurant.pk)
+        if locked.marketplace_approved != approved:
+            locked.marketplace_approved = approved
+            locked.save(update_fields=["marketplace_approved", "updated_at"])
+            audit(actor, "customer.marketplace_approved" if approved else "customer.marketplace_removed", "restaurant", locked.pk, locked.slug)
+    return locked
+
+
 def extend_access(restaurant_id, actor, days, reason=""):
     """Give a restaurant more time (a goodwill extension, or a manual fix). A trial or ended subscription becomes a trial again."""
     with transaction.atomic():

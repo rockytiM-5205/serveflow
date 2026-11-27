@@ -53,15 +53,18 @@ export function marketplaceCard({ data, url, canEdit, reload }) {
 
   const category = CATEGORIES.find((c) => c.value === data.category)?.label ?? "Not set";
   const listed = data.listed_in_marketplace;
+  const waiting = listed && !data.marketplace_approved;  // switched on, but ServeFlow hasn't approved it yet
   return el("section", { class: "card card__pad stack", "aria-labelledby": "market-h" },
     el("div", { class: "section-head", style: "margin:0" },
       el("h2", { id: "market-h" }, "Marketplace"),
       canEdit ? el("button", { class: "btn btn--secondary btn--sm", type: "button", onclick: edit }, "Edit") : null),
-    el("p", { class: "muted" }, listed
-      ? "Customers can find you in the marketplace."
-      : "You are not in the marketplace. Customers can still order from your own link."),
+    el("p", { class: "muted" }, waiting
+      ? "Waiting for ServeFlow to approve your restaurant. Customers can't find you in the marketplace until then, but your own link works."
+      : listed
+        ? "Customers can find you in the marketplace."
+        : "You are not in the marketplace. Customers can still order from your own link."),
     el("dl", { class: "details" },
-      el("dt", {}, "Listed"), el("dd", {}, listed ? "Yes" : "No"),
+      el("dt", {}, "Listed"), el("dd", {}, waiting ? "Waiting for approval" : listed ? "Yes" : "No"),
       el("dt", {}, "Category"), el("dd", {}, category),
       el("dt", {}, "Area"), el("dd", {}, data.area || "Not set"),
       el("dt", {}, "Location"), el("dd", {}, data.latitude != null && data.longitude != null ? `${data.latitude}, ${data.longitude}` : "Not set (no distance search)")),

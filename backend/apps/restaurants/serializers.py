@@ -198,9 +198,9 @@ class RestaurantSettingsSerializer(PictureUrlsMixin, RestaurantWriteSerializer):
         fields = (
             *RestaurantWriteSerializer.Meta.fields, "accepting_orders", "auto_accept_orders", "pickup_fee", "late_fee_enabled", "late_grace_minutes",
             "late_fee_amount", "late_fee_interval_minutes", "late_fee_max", "category", "area", "latitude", "longitude",
-            "listed_in_marketplace", "logo_url", "cover_url", "order_prefix_locked",
+            "listed_in_marketplace", "marketplace_approved", "logo_url", "cover_url", "order_prefix_locked",
         )
-        read_only_fields = ("slug",)
+        read_only_fields = ("slug", "marketplace_approved")
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

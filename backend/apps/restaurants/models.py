@@ -90,6 +90,9 @@ class Restaurant(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     listed_in_marketplace = models.BooleanField(default=False, help_text="Show this restaurant in the ServeFlow marketplace. Off until the owner switches it on.")
+    marketplace_approved = models.BooleanField(
+        default=False, editable=False,
+        help_text="ServeFlow has checked this restaurant and allowed it into the marketplace. Only the platform owner sets it; the restaurant switch above does nothing until it is on.")
     # Maintained by the reviews feature from verified, completed orders only. Never typed in by hand.
     rating_average = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True, editable=False)
     rating_count = models.PositiveIntegerField(default=0, editable=False)

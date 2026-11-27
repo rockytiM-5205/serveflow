@@ -11,6 +11,7 @@ urlpatterns = [
     path("usage/", views.UsageView.as_view(), name="platform-usage"),
     path("customers/", views.CustomerListCreateView.as_view(), name="platform-customers"),
     path("customers/<int:pk>/", views.CustomerDetailView.as_view(), name="platform-customer"),
+    path("customers/<int:pk>/marketplace/", views.CustomerMarketplaceView.as_view(), name="platform-customer-marketplace"),
     path("customers/<int:pk>/reset-admin-password/", views.CustomerResetAdminPasswordView.as_view(), name="platform-customer-reset-admin"),
     path("customers/<int:pk>/extend/", views.CustomerExtendView.as_view(), name="platform-customer-extend"),
     path("customers/<int:pk>/plan/", views.CustomerPlanView.as_view(), name="platform-customer-plan"),

@@ -23,7 +23,7 @@ The browser only ever talks to your Vercel address. Vercel forwards `/api/v1/` a
 | `DJANGO_SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(64))"` (must be 50+ characters) |
 | `DATABASE_URL` / `DIRECT_DATABASE_URL` | the two Neon strings |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://your-app.vercel.app` (add your own domain later, comma separated) |
-| `DJANGO_ADMIN_URL` | something non-obvious, e.g. `manage-7f3k/` |
+| `DJANGO_ADMIN_URL` | something non-obvious, e.g. `manage-7f3k/` (only matters if you switch the Django admin on, see below) |
 | `CLOUDINARY_URL` | from Cloudinary: Dashboard > API Keys, copy the "API environment variable": `cloudinary://API_KEY:API_SECRET@CLOUD_NAME` |
 | `PAYMENT_WEBHOOK_SECRET`, `VAPID_*` | optional (see `.env.example`) |
 
@@ -58,3 +58,11 @@ The browser only ever talks to your Vercel address. Vercel forwards `/api/v1/` a
 - **Neon** pauses an idle free database; the first query after a pause is slower. Check Neon's backup/restore window for your plan.
 - **Platform owner dashboard:** open `https://your-app.vercel.app/owner-control-centre/`. The Django admin is at `https://YOUR-SERVICE.onrender.com/<DJANGO_ADMIN_URL>`.
 - HSTS starts at one hour (`DJANGO_SECURE_HSTS_SECONDS`). Raise it once everything is confirmed on HTTPS.
+
+## Security settings added after the audit
+- **Django admin is OFF in production.** The Owner Control Centre covers daily work. To use the admin, set `DJANGO_ADMIN_ENABLED=True` (and a custom `DJANGO_ADMIN_URL`). When on, 5 wrong passwords for one email, or 20 from one address, lock the admin login for 15 minutes.
+- **`DJANGO_NUM_PROXIES` is now required** whenever `DJANGO_TRUST_PROXY_SSL_HEADER=True` (the app refuses to start without it). It is how many proxies of yours sit in front of Django, counted from the right of `X-Forwarded-For`: Render alone = 1, Vercel then Render = 2. Anything a visitor writes in that header is ignored. **Limit:** with Vercel in front, someone who calls the Render address directly can still choose their own address. The sign-up and per-restaurant order limits do not depend on addresses, but for strong per-address limits give Render its own domain (for example `api.yourdomain.com` next to `app.yourdomain.com`) and set the count to 1.
+- **Marketplace needs your approval.** A restaurant that switches the marketplace on waits until you press "Approve for marketplace" in the Owner Control Centre (you also get a notification). After upgrading, run once, on the live database: `python manage.py approve_marketplace --already-listed` so restaurants that were already listed stay listed. You are also notified when a restaurant changes its bank details.
+- **Order capacity:** an order counts against the allowance when it is marked paid (not only when it completes). Marking a payment as received is refused with `ORDER_LIMIT_REACHED` once paid orders would exceed what is left.
+- **Order alerts** accept only real browser push services (Google, Mozilla, Apple, Microsoft), at most 10 devices per person per restaurant. Add another service with `DJANGO_PUSH_EXTRA_HOSTS=host1,host2`.
+- **Database change:** `marketplace_approved` is a new column on Restaurant. Run `python manage.py makemigrations restaurants`, review it, then `migrate`.

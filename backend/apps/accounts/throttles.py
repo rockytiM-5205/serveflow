@@ -1,6 +1,6 @@
 import hashlib
 
-from rest_framework.throttling import SimpleRateThrottle
+from apps.common.throttles import SimpleRateThrottle
 
 
 class LoginIPThrottle(SimpleRateThrottle):

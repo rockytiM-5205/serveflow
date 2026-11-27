@@ -7,12 +7,13 @@ from rest_framework.generics import (
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from apps.common.throttles import ScopedRateThrottle
 
 from apps.audit.services import record
 from apps.common.images import ImageRejected, process_image
 from apps.common.pagination import DefaultCursorPagination
 from apps.common.schema import SLUG_PARAM, staff_schema
+from apps.platform_admin.notifications import notify
 
 from . import hours
 from .models import MembershipRole, OpeningPeriod, PaymentAccount, Restaurant, RestaurantMembership
@@ -100,6 +101,9 @@ class RestaurantSettingsView(RestaurantScopedMixin, RetrieveUpdateAPIView):
                     restaurant=restaurant, actor=self.request.user, action="restaurant.settings_changed",
                     entity_type="restaurant", entity_id=restaurant.pk, metadata={"changed": changed},
                 )
+            if "listed_in_marketplace" in changed and restaurant.listed_in_marketplace and not restaurant.marketplace_approved:
+                notify("marketplace_review", f"{restaurant.name} wants to be in the marketplace", "Check the restaurant, then approve it.",
+                       "#/customers", restaurant, f"marketplace_review:{restaurant.pk}")
 
 
 class RestaurantCreateView(CreateAPIView):
@@ -254,4 +258,7 @@ class PaymentAccountView(RestaurantScopedMixin, GenericAPIView):
                 restaurant=request.restaurant, actor=request.user, action="restaurant.payment_account_changed",
                 entity_type="restaurant", entity_id=request.restaurant.pk, metadata={"bank_name": account.bank_name},
             )
+            if existing is not None:  # customers are told to pay into this account, so the platform owner is told when it changes
+                notify("payment_account_changed", f"{request.restaurant.name} changed its bank details",
+                       "Customers now pay into the new account. Check that this was expected.", "#/customers", request.restaurant)
         return Response(PaymentAccountSerializer(account).data)

@@ -7,7 +7,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from apps.common.throttles import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.common.authentication import CsrfSessionAuthentication
@@ -19,7 +19,7 @@ from . import idempotency
 from .models import ActorType, IdempotencyScope, Order, OrderSource, OrderStatus
 from .serializers import PUBLIC_ITEMS, OrderCreatedSerializer, OrderCreateSerializer, PublicOrderSerializer
 from .services import claim_payment, create_order
-from .throttles import OrderPhoneThrottle
+from .throttles import OrderPhoneThrottle, OrderRestaurantThrottle
 from .tokens import make_token, parse_token, verify_token
 from .workflow import change_status
 
@@ -52,7 +52,7 @@ class OrderCreateView(APIView):
     # Guests need nothing. A signed-in customer account is recognised (so the order lands in their history); CSRF is then enforced.
     authentication_classes = [CsrfSessionAuthentication]
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle, OrderPhoneThrottle]
+    throttle_classes = [ScopedRateThrottle, OrderPhoneThrottle, OrderRestaurantThrottle]
     throttle_scope = "order_create"
 
     @extend_schema(

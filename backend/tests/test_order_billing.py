@@ -458,3 +458,32 @@ def test_cancelling_a_ready_order_needs_a_manager_who_acknowledges_it(shop, make
         change_status(order=order, to_status=OrderStatus.CANCELLED, actor_type=ActorType.MANAGER, reason="x")
     change_status(order=order, to_status=OrderStatus.CANCELLED, actor_type=ActorType.MANAGER, reason="x", acknowledge_serving=True)
     assert usage_count(shop.restaurant) == 0
+
+
+# ---------------------------------------------------------------- paid orders reserve capacity (no queue-then-complete bypass)
+def test_paid_orders_reserve_capacity_so_queued_orders_cannot_all_finish_beyond_the_allowance(shop, subscribe, make_order, place, staff_login):
+    from apps.orders.services import record_payment
+    from apps.platform_admin.usage import OrderLimitReached
+
+    subscribe(shop.restaurant, allowance=2)
+    staff = staff_login(shop.restaurant)
+    orders = [make_order() for _ in range(4)]  # unpaid orders reserve nothing, so all four can be queued
+    for order in orders[:2]:
+        record_payment(order=order, actor_user=staff, method="CASH", amount=order.total)
+    with pytest.raises(OrderLimitReached):  # a third paid order would finish beyond the allowance
+        record_payment(order=orders[2], actor_user=staff, method="CASH", amount=orders[2].total)
+    orders[2].refresh_from_db()
+    assert orders[2].payment_status != "PAID" and not Payment.objects.filter(order=orders[2]).exists()
+    blocked = place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079468888")  # and new orders are refused too
+    assert blocked.status_code == 402 and code(blocked) == "ORDER_LIMIT_REACHED"
+    complete(orders[0])
+    complete(orders[1])
+    assert usage.summary(Subscription.objects.get(restaurant=shop.restaurant))["completed_orders"] == 2
+    assert OrderUsage.objects.filter(restaurant=shop.restaurant, charged_to="OVERAGE").count() == 0
+
+
+def test_unpaid_orders_do_not_use_up_the_allowance(shop, subscribe, make_order, place):
+    subscribe(shop.restaurant, allowance=2)
+    for _ in range(5):
+        make_order()  # five unpaid orders queued by anyone
+    assert place(shop.restaurant, [(shop.rice.pk, 1)], phone="+442079467777").status_code == 201

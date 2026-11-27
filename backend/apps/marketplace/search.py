@@ -19,7 +19,7 @@ EARTH_RADIUS_KM = 6371.0088
 
 
 def listed_restaurants(now=None):
-    """Restaurants a customer may see and order from: switched on by the owner, not suspended, and not locked for billing."""
+    """Restaurants a customer may see and order from: switched on by the owner, approved by the platform owner, not suspended, and not locked for billing."""
     now = now or timezone.now()
     grace = timedelta(days=getattr(settings, "BILLING_GRACE_DAYS", 3))
     unlocked = (
@@ -27,7 +27,7 @@ def listed_restaurants(now=None):
         | Q(subscription__status="TRIAL", subscription__current_period_end__gte=now)
         | Q(subscription__status__in=["ACTIVE", "PAST_DUE"], subscription__current_period_end__gte=now - grace)
     )
-    return Restaurant.objects.filter(is_active=True, listed_in_marketplace=True).filter(unlocked)
+    return Restaurant.objects.filter(is_active=True, listed_in_marketplace=True, marketplace_approved=True).filter(unlocked)
 
 
 def distance_km(lat, lng):

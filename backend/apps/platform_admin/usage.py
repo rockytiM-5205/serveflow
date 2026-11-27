@@ -8,15 +8,19 @@ The rules, in one place:
   never changes a period that already exists. Periods follow the subscription's anniversary, not the calendar month.
 * A period's capacity is its included allowance plus any ACTIVE order packs bought for that period. Packs expire with the
   period; unused capacity never rolls over.
-* New orders are refused (ORDER_LIMIT_REACHED) once completed orders reach the capacity. Orders accepted earlier can
-  still be completed: they are recorded as OVERAGE so counts stay truthful and nobody is stuck mid-service.
+* New orders are refused (ORDER_LIMIT_REACHED) once completed orders PLUS orders already paid and still in progress reach the
+  capacity. Those paid-in-progress orders are "committed": they will complete and be counted, so they reserve a slot. Marking an
+  order paid is refused the same way, which is what stops anyone queueing orders below the limit and finishing them all beyond it.
+  Unpaid orders reserve nothing (otherwise anyone could fill a restaurant's allowance with fake orders). The only way to exceed the
+  allowance is an order that was already paid when the allowance ran out; it is recorded as OVERAGE so counts stay truthful and
+  nobody is stuck mid-service.
 * Everything here reads the database. The 30-second lock cache in locks.py is never trusted for billing decisions.
 """
 import calendar
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, F
 from django.utils import timezone
 
@@ -176,12 +180,36 @@ def summary(subscription, now=None):
 
 
 # ---------------------------------------------------------------- enforcement
+def committed_open_orders(restaurant_id) -> int:
+    """Orders that are paid and not finished: they will become COMPLETED, so each one already holds a slot of the allowance."""
+    from apps.orders.models import Order, OrderStatus, PaymentStatus
+
+    return Order.objects.filter(
+        restaurant_id=restaurant_id, payment_status=PaymentStatus.PAID,
+        status__in=[OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.SERVING, OrderStatus.READY_FOR_PICKUP],
+    ).count()
+
+
+def _locked_subscription(restaurant):
+    qs = Subscription.objects.select_related("plan").filter(restaurant_id=restaurant.pk)
+    if connection.in_atomic_block:  # serialise concurrent checks for one restaurant behind the subscription row
+        qs = qs.select_for_update(of=("self",))
+    return qs.first()
+
+
+def _assert_slot_free(sub, period, now):
+    cap = capacity(period, now)
+    committed = committed_open_orders(sub.restaurant_id)
+    if cap["remaining"] - committed <= 0:
+        raise OrderLimitReached(period, {"allowance": cap["capacity"], "completed_orders": cap["used"], "paid_in_progress": committed})
+
+
 def assert_can_accept_orders(restaurant, now=None):
     """Raise unless this restaurant may accept a NEW order right now. Restaurants without a subscription are not limited."""
     if not getattr(settings, "PLATFORM_ENFORCE_ORDER_LIMITS", True):
         return
     now = now or timezone.now()
-    sub = Subscription.objects.select_related("plan").filter(restaurant_id=restaurant.pk).first()
+    sub = _locked_subscription(restaurant)
     if sub is None:
         return
     if getattr(settings, "PLATFORM_ENFORCE_SUBSCRIPTIONS", True) and locks.is_locked(sub.status, sub.current_period_end, now):
@@ -189,9 +217,22 @@ def assert_can_accept_orders(restaurant, now=None):
     period = current_period(sub, now)
     if period is None:
         raise SubscriptionInactive()
-    cap = capacity(period, now)
-    if cap["remaining"] <= 0:
-        raise OrderLimitReached(period, {"allowance": cap["capacity"], "completed_orders": cap["used"]})
+    _assert_slot_free(sub, period, now)
+
+
+def assert_can_commit_payment(restaurant, now=None):
+    """Raise ORDER_LIMIT_REACHED when marking one more order paid would put paid orders beyond the allowance. Called when staff
+    confirm a payment. No subscription, or no current period, means no limit here (the lock checks live elsewhere)."""
+    if not getattr(settings, "PLATFORM_ENFORCE_ORDER_LIMITS", True):
+        return
+    now = now or timezone.now()
+    sub = _locked_subscription(restaurant)
+    if sub is None:
+        return
+    period = current_period(sub, now)
+    if period is None:
+        return
+    _assert_slot_free(sub, period, now)
 
 
 # ---------------------------------------------------------------- the ledger

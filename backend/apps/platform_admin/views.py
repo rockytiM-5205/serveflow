@@ -104,7 +104,7 @@ def _customers():
         requests_30d=Coalesce(Subquery(usage, output_field=BigIntegerField()), 0), admin_email=Subquery(admin))
 
 
-RESTAURANT_FIELDS = ("description", "contact_phone", "address", "currency", "timezone", "pickup_enabled", "dine_in_enabled", "requires_table_number", "accepting_orders")
+RESTAURANT_FIELDS = ("listed_in_marketplace", "marketplace_approved", "description", "contact_phone", "address", "currency", "timezone", "pickup_enabled", "dine_in_enabled", "requires_table_number", "accepting_orders")
 
 
 def customer_detail(restaurant_id):
@@ -123,7 +123,7 @@ def customer_detail(restaurant_id):
         "credentials": [credential_row(c) for c in ApiCredential.objects.select_related("restaurant__subscription__plan").filter(restaurant=r).order_by("-id")[:20]],
         "activity": [{"occurred_at": e.created_at, "summary": f"{e.action}: {e.summary}".strip(": ")}
                      for e in PlatformAuditEvent.objects.filter(resource_type="restaurant", resource_id=str(r.pk)).order_by("-created_at", "-id")[:10]],
-        "allowed_actions": ["suspend" if r.is_active else "reactivate", "extend", "change_plan", "grant_orders", "reset_admin_password", "edit", "delete"],
+        "allowed_actions": ["suspend" if r.is_active else "reactivate", "marketplace", "extend", "change_plan", "grant_orders", "reset_admin_password", "edit", "delete"],
     })
     return data
 
@@ -210,6 +210,19 @@ class CustomerResetAdminPasswordView(OwnerMixin, APIView):
     def post(self, request, pk):
         password = customers.reset_admin_password(get_object_or_404(Restaurant, pk=pk), request.user)
         return Response({"temporary_password": password}, headers={"Cache-Control": "no-store"})
+
+
+@hidden("post")
+class CustomerMarketplaceView(OwnerMixin, APIView):
+    """Approve a restaurant for the marketplace, or take it out. Body: {"approved": true|false}."""
+
+    def post(self, request, pk):
+        data = request.data if isinstance(request.data, dict) else {}
+        approved = data.get("approved")
+        if not isinstance(approved, bool):
+            raise serializers.ValidationError({"approved": ["Send true or false."]})
+        customers.set_marketplace_approval(get_object_or_404(Restaurant, pk=pk), request.user, approved)
+        return Response(customer_detail(pk))
 
 
 @hidden("post")

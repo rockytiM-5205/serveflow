@@ -41,12 +41,16 @@ SECURE_HSTS_PRELOAD = False
 # Only enable behind a trusted reverse proxy that sets and sanitises this header.
 if env.bool("DJANGO_TRUST_PROXY_SSL_HEADER", default=False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    if TRUSTED_PROXY_COUNT < 1:  # noqa: F405
+        # Behind a proxy every request arrives from the proxy's own address, so per-IP limits would treat all customers as one person.
+        raise ImproperlyConfigured("Set DJANGO_NUM_PROXIES to the number of proxies in front of this app (Render alone: 1; Vercel then Render: 2).")
 
 # Uploaded pictures. Preferred: Cloudinary. Set CLOUDINARY_URL (cloudinary://API_KEY:API_SECRET@CLOUD_NAME) and every upload is stored there
 # and served from Cloudinary's CDN (see below), so nothing is lost when Render redeploys.
 # Fallback without Cloudinary: Render's disk is wiped on every deploy unless a persistent disk is attached, so set DJANGO_MEDIA_ROOT to the
 # disk's mount path (for example /var/data/media) and DJANGO_SERVE_MEDIA=True to let Django serve it. Off by default.
 SERVE_MEDIA_FILES = env.bool("DJANGO_SERVE_MEDIA", default=False)
+ADMIN_ENABLED = env.bool("DJANGO_ADMIN_ENABLED", default=False)
 SECURE_REDIRECT_EXEMPT = [r"^healthz$"]  # the host's health check calls this over plain HTTP
 
 # Static files (Django admin, API docs) are served by WhiteNoise from the same process. Run `collectstatic` at build time.

@@ -6,7 +6,7 @@ from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from apps.common.throttles import CustomerSignupGlobalThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.throttles import LoginEmailThrottle, LoginIPThrottle
@@ -36,7 +36,7 @@ class CustomerView(APIView):
 class RegisterView(APIView):
     authentication_classes = [CsrfSessionAuthentication]
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedRateThrottle, CustomerSignupGlobalThrottle]
     throttle_scope = "customer_signup"
 
     @extend_schema(request=CustomerRegisterSerializer, responses={201: CustomerSerializer}, summary="Create a customer account")

@@ -1,6 +1,4 @@
 """Order alerts: a device subscribes (or stops) here. Mounted under /api/v1/restaurants/<slug>/push/."""
-from urllib.parse import urlparse
-
 from django.conf import settings
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
@@ -15,14 +13,16 @@ from .models import MembershipRole, PushSubscription, Restaurant
 from .permissions import RestaurantScopedMixin
 
 
+MAX_DEVICES = 10  # per person per restaurant
+
+
 class SubscribeSerializer(serializers.Serializer):
     endpoint = serializers.CharField(max_length=1000)
     p256dh = serializers.CharField(max_length=200)
     auth = serializers.CharField(max_length=100)
 
     def validate_endpoint(self, value):
-        parsed = urlparse(value)
-        if parsed.scheme != "https" or not parsed.netloc:
+        if not push.is_push_service(value):
             raise serializers.ValidationError("This isn't a valid push address.")
         return value
 
@@ -69,6 +69,9 @@ class PushSubscribeView(PushBase):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         with transaction.atomic():
+            known = PushSubscription.objects.filter(endpoint=data["endpoint"]).exists()
+            if not known and PushSubscription.objects.filter(restaurant=request.restaurant, user=request.user).count() >= MAX_DEVICES:
+                raise serializers.ValidationError({"endpoint": [f"You can turn alerts on for up to {MAX_DEVICES} devices. Turn one off first."]})
             PushSubscription.objects.update_or_create(
                 endpoint=data["endpoint"],  # the same device always has the same address: moving restaurant or user just updates it
                 defaults={"restaurant": request.restaurant, "user": request.user, "p256dh": data["p256dh"], "auth": data["auth"],

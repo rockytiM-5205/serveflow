@@ -151,6 +151,7 @@ def record_payment(*, order, actor_user, method, amount, reference=""):
             )
         if amount != locked.total:
             raise ValidationError({"amount": [f"The amount must equal the order total ({locked.total})."]})
+        usage.assert_can_commit_payment(locked.restaurant)  # a paid order will complete and be counted, so it must fit the allowance
         Payment.objects.create(
             order=locked, restaurant=locked.restaurant, amount=amount, currency=locked.currency, method=method,
             reference=reference, recorded_by=actor_user,

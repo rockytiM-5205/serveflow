@@ -211,6 +211,11 @@ function customerDrawer(summary, reload) {
         const r = await platform.action("customers", c.id, "reset-admin-password");
         secretDialog({ title: "New temporary password", message: "Shown once. The admin is signed out everywhere and uses this to sign in again.", lines: [["Restaurant", c.name], ["Email", c.admin?.email]], secret: r.temporary_password, secretLabel: "Temporary password" });
       }, { message: "The current password stops working immediately and you'll get a new temporary one to hand over.", confirmLabel: "Reset password" });
+      const marketplace = c.marketplace_approved
+        ? act("Remove from marketplace", async () => { await platform.action("customers", c.id, "marketplace", { approved: false }); toast(`${c.name} removed from the marketplace.`, { type: "success" }); refresh(); },
+          { danger: true, confirmLabel: "Remove", message: "Customers stop seeing this restaurant in the marketplace. Its own ordering link keeps working." })
+        : act("Approve for marketplace", async () => { await platform.action("customers", c.id, "marketplace", { approved: true }); toast(`${c.name} approved for the marketplace.`, { type: "success" }); refresh(); },
+          { confirmLabel: "Approve", message: c.listed_in_marketplace ? "They have asked to be listed. Check their name, address and bank details first: customers pay into the account shown." : "They haven't switched the marketplace on yet. Approving lets them appear once they do. Check their name, address and bank details first." });
       const extend = el("button", { class: "btn btn--secondary btn--sm", type: "button", onclick: async () => {
         const saved = await modalForm({ title: `Give ${c.name} more time`, description: "A trial or ended subscription becomes a trial again until the new date. It's recorded in the audit log.", submitLabel: "Extend",
           fields: [{ name: "days", label: "Days to add", type: "text", inputmode: "numeric", required: true, validate: (v) => (/^\d{1,3}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 365 ? null : "Enter 1 to 365.") }, { name: "reason", label: "Reason (optional)", type: "text", maxlength: 120 }],
@@ -249,7 +254,7 @@ function customerDrawer(summary, reload) {
       body.replaceChildren(...[
         el("section", { class: "card oc-panel" },
           el("div", { class: "oc-cell" }, avatar(c.name, true), el("div", {}, el("strong", {}, c.name), el("small", {}, c.account_id)), statusBadge(c.status), c.subscription ? statusBadge(c.subscription.status) : null),
-          el("div", { class: "oc-actions" }, suspendOrBack, reset, extend, changePlan, ...(c.billing?.usage ? [grantOrders] : []), remove)),
+          el("div", { class: "oc-actions" }, suspendOrBack, marketplace, reset, extend, changePlan, ...(c.billing?.usage ? [grantOrders] : []), remove)),
         section("Subscription", dl([["On plan", c.subscription?.plan?.name], ["Will pay for", c.subscription?.next_plan?.name ?? "Not chosen yet"], ["Status", c.subscription ? statusBadge(c.subscription.status) : "No subscription yet"], ["Period", c.subscription ? `${fmtDate(c.subscription.current_period_start)} – ${fmtDate(c.subscription.current_period_end)}` : null], ["Trial ends", fmtDate(c.subscription?.trial_ends_at)]])),
         c.billing ? section("Orders this period", billingBlock(c.billing)) : null,
         section("Restaurant details", details.form),

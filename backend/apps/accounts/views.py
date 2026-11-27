@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from apps.common.throttles import ScopedRateThrottle, SignupGlobalThrottle
 from rest_framework.views import APIView
 
 from apps.common.authentication import CsrfSessionAuthentication, enforce_csrf
@@ -82,7 +82,7 @@ class OptionsView(APIView):
 class SignupView(APIView):
     authentication_classes = [CsrfSessionAuthentication]
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedRateThrottle, SignupGlobalThrottle]
     throttle_scope = "signup"
 
     @extend_schema(request=SignupSerializer, responses={201: SessionSerializer}, summary="Create an account (self-service only)")
