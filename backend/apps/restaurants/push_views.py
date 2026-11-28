@@ -44,6 +44,10 @@ class PushStateSerializer(serializers.Serializer):
 class PushSentSerializer(serializers.Serializer):
     sent = serializers.IntegerField()
     enabled = serializers.BooleanField()
+    scheduled = serializers.IntegerField(required=False, help_text="Seconds until the test alert is sent (when a delay was asked for).")
+    devices = serializers.IntegerField(required=False, help_text="How many devices ServeFlow knows for you.")
+    problem = serializers.CharField(required=False, help_text="no_devices, refused or failed when nothing was delivered.")
+    status = serializers.IntegerField(required=False, allow_null=True, help_text="The push service's HTTP status, when it gave one.")
 
 
 class PushBase(RestaurantScopedMixin, GenericAPIView):
@@ -101,6 +105,19 @@ class PushTestView(PushBase):
         if not push.enabled():
             return Response({"sent": 0, "enabled": False})
         mine = list(PushSubscription.objects.filter(restaurant=request.restaurant, user=request.user))
-        sent = push.send_to(mine, {"title": "ServeFlow alerts are on", "body": "You will see a message like this for every new order.",
-                                   "url": push.DASHBOARD_ORDERS, "tag": "test", "icon": push.ICON})
-        return Response({"sent": sent, "enabled": True})
+        payload = {"title": "ServeFlow alerts are on", "body": "You will see a message like this for every new order.",
+                   "url": push.DASHBOARD_ORDERS, "tag": "test", "icon": push.ICON}
+        try:
+            delay = max(0, min(int(request.data.get("delay_seconds") or 0), 120)) if isinstance(request.data, dict) else 0
+        except (TypeError, ValueError):
+            delay = 0
+        if delay and mine:  # sent later, so the app can be closed first
+            push.send_later(mine, payload, delay)
+            return Response({"sent": 0, "enabled": True, "scheduled": delay, "devices": len(mine)})
+        report = push.send_report(mine, payload)
+        body = {"sent": report["delivered"], "enabled": True}
+        if not report["delivered"]:  # say why, so nobody has to read server logs
+            body["devices"] = report["devices"]
+            body["status"] = report["status"]
+            body["problem"] = "no_devices" if not report["devices"] else "refused" if report["status"] in (401, 403) else "failed"
+        return Response(body)

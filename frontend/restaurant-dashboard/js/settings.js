@@ -144,13 +144,24 @@ async function main() {
         const test = el("button", { class: "btn btn--secondary btn--sm", type: "button" }, "Send a test alert");
         test.addEventListener("click", act(test, async () => {
           const r = await api.post(`${pushBase}/push/test/`, {});
-          toast(r.sent ? "Test alert sent." : "Nothing was sent. Try turning alerts off and on again.", { type: r.sent ? "success" : "info" });
+          const why = r.sent ? "Test alert sent."
+            : r.enabled === false ? "Order alerts aren't set up on the ServeFlow server yet (its alert keys are missing)."
+            : r.problem === "no_devices" ? "ServeFlow doesn't know this device yet. Turn alerts off, then on again."
+            : r.problem === "refused" ? "Your phone's alert service refused the message. Turn alerts off, then on again."
+            : "The alert couldn't be delivered. Turn alerts off and on again, then try once more.";
+          toast(why, { type: r.sent ? "success" : "info" });
+        }));
+        const later = el("button", { class: "btn btn--secondary btn--sm", type: "button" }, "Test in 30 seconds");
+        later.addEventListener("click", act(later, async () => {
+          const r = await api.post(`${pushBase}/push/test/`, { delay_seconds: 30 });
+          toast(r.scheduled ? "Test alert coming in 30 seconds. Close ServeFlow now (swipe it away) and wait for it."
+            : "ServeFlow doesn't know this device yet. Turn alerts off, then on again.", { type: r.scheduled ? "success" : "info" });
         }));
         const off = el("button", { class: "btn btn--ghost btn--sm", type: "button" }, "Turn off");
         off.addEventListener("click", act(off, async () => { await turnOff({ api, base: pushBase }); toast("Alerts are off on this device.", { type: "success" }); }));
         rows.push(el("p", {}, el("strong", {}, "On for this device. "), "You will get a message for every new order, even when ServeFlow isn't open."),
           el("p", { class: "muted" }, "If alerts stop after you close the app: in your phone's Settings, allow notifications for your browser (or the ServeFlow app) and set its battery use to Unrestricted. Some phones also need Autostart switched on."),
-          el("div", { class: "row" }, test, off));
+          el("div", { class: "row" }, test, later, off));
       } else {
         const turn = el("button", { class: "btn btn--primary", type: "button" }, icon("bell"), "Turn on alerts on this device");
         turn.addEventListener("click", act(turn, async () => {
