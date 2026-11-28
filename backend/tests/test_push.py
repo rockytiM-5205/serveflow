@@ -174,3 +174,45 @@ def test_one_person_cannot_register_an_unlimited_number_of_devices(api_client, s
     for i in range(MAX_DEVICES):
         assert api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": f"https://fcm.googleapis.com/fcm/send/{i}"}, format="json").status_code == 200
     assert api_client.post(url("restaurant-push-subscribe", shop), {**DEVICE, "endpoint": "https://fcm.googleapis.com/fcm/send/extra"}, format="json").status_code == 400
+
+
+def test_the_test_alert_says_what_is_wrong_when_nothing_is_delivered(api_client, shop, staff_login, vapid):
+    staff_login(shop.restaurant, STAFF)
+    body = api_client.post(url("restaurant-push-test", shop)).json()  # no device registered yet
+    assert body["sent"] == 0 and body["enabled"] is True and body["devices"] == 0 and body["problem"] == "no_devices"
+
+
+def test_a_refused_alert_is_reported_with_the_push_services_status(api_client, shop, staff_login, vapid, monkeypatch):
+    staff_login(shop.restaurant, STAFF)
+    api_client.post(url("restaurant-push-subscribe", shop), DEVICE, format="json")
+
+    class Refused(Exception):
+        response = type("R", (), {"status_code": 403})()
+
+    def refuse(subscription, payload):
+        raise Refused("UnauthorizedRegistration")
+
+    monkeypatch.setattr(push, "_deliver", refuse)
+    body = api_client.post(url("restaurant-push-test", shop)).json()
+    assert body["sent"] == 0 and body["devices"] == 1 and body["status"] == 403 and body["problem"] == "refused"
+    assert PushSubscription.objects.count() == 1  # a refusal is not "gone": the device is kept
+
+
+def test_a_delayed_test_alert_is_scheduled_so_the_app_can_be_closed_first(api_client, shop, staff_login, vapid, monkeypatch):
+    staff_login(shop.restaurant, STAFF)
+    api_client.post(url("restaurant-push-subscribe", shop), DEVICE, format="json")
+    calls = []
+    monkeypatch.setattr(push, "send_later", lambda subscriptions, payload, delay: calls.append((len(subscriptions), delay)))
+    body = api_client.post(url("restaurant-push-test", shop), {"delay_seconds": 30}, format="json").json()
+    assert body == {"sent": 0, "enabled": True, "scheduled": 30, "devices": 1} and calls == [(1, 30)]
+    api_client.post(url("restaurant-push-test", shop), {"delay_seconds": 9999}, format="json")
+    assert calls[-1] == (1, 120)  # never longer than two minutes
+
+
+def test_the_delayed_send_waits_then_delivers(shop, make_user, monkeypatch):
+    sub = PushSubscription.objects.create(restaurant=shop.restaurant, user=make_user(), endpoint=DEVICE["endpoint"], p256dh="k", auth="a")
+    waited, delivered = [], []
+    monkeypatch.setattr(push.time, "sleep", lambda seconds: waited.append(seconds))
+    monkeypatch.setattr(push, "_deliver", lambda subscription, payload: delivered.append(subscription.pk))
+    push._send_after([sub.pk], {"title": "t"}, 30)
+    assert waited == [30] and delivered == [sub.pk]

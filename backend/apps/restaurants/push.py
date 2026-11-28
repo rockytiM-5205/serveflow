@@ -3,6 +3,7 @@
 Sending happens in a background thread after the order has been saved, so a slow push service can never delay a customer's checkout.
 A device the browser says is gone (404 or 410) is forgotten. Alerts carry only the order reference and the number of items."""
 import json
+import time
 import logging
 import threading
 from urllib.parse import urlparse
@@ -68,32 +69,58 @@ def _deliver(subscription, payload):
         raise
 
 
-def send_to(subscriptions, payload):
-    """Send to each subscription, forgetting the ones that are gone. Returns how many were delivered."""
-    delivered = 0
+def send_report(subscriptions, payload):
+    """Send to each subscription, forgetting the ones that are gone. Returns what happened:
+    {"devices", "delivered", "gone", "failed", "status"}; status is the push service's HTTP status for the last failure, if it gave one."""
+    report = {"devices": len(subscriptions), "delivered": 0, "gone": 0, "failed": 0, "status": None}
     for subscription in subscriptions:
         try:
             _deliver(subscription, payload)
         except PushGone:
             subscription.delete()
-        except Exception:  # noqa: BLE001 - one bad device must not stop the others
-            log.warning("Push to %s failed", subscription.pk, exc_info=True)
+            report["gone"] += 1
+        except Exception as exc:  # noqa: BLE001 - one bad device must not stop the others
+            report["failed"] += 1
+            report["status"] = getattr(getattr(exc, "response", None), "status_code", None)
+            log.warning("Push to device %s failed: %s", subscription.pk, exc, exc_info=True)
         else:
-            delivered += 1
+            report["delivered"] += 1
             PushSubscription.objects.filter(pk=subscription.pk).update(last_success_at=timezone.now())
-    return delivered
+    return report
+
+
+def send_to(subscriptions, payload):
+    """Send to each subscription. Returns how many were delivered."""
+    return send_report(subscriptions, payload)["delivered"]
 
 
 def _send_all(restaurant_id, payload):
     try:
-        send_to(list(PushSubscription.objects.filter(restaurant_id=restaurant_id)), payload)
+        report = send_report(list(PushSubscription.objects.filter(restaurant_id=restaurant_id)), payload)
+        # One plain line per alert, so the server log shows exactly what happened (devices known, delivered, refused).
+        (log.info if report["delivered"] else log.warning)("Order alert for restaurant %s: %s", restaurant_id, report)
     finally:
         connection.close()  # this thread opened its own database connection
 
 
+def _send_after(subscription_ids, payload, delay):
+    try:
+        time.sleep(delay)
+        send_report(list(PushSubscription.objects.filter(pk__in=subscription_ids)), payload)
+    finally:
+        connection.close()
+
+
+def send_later(subscriptions, payload, delay):
+    """Send after `delay` seconds from a background thread: lets someone close the app first and prove that alerts arrive without it."""
+    threading.Thread(target=_send_after, args=([s.pk for s in subscriptions], payload, delay), daemon=True).start()
+
+
 def send_async(restaurant_id, payload):
-    if enabled():
-        threading.Thread(target=_send_all, args=(restaurant_id, payload), daemon=True).start()
+    if not enabled():
+        log.warning("Order alerts are OFF on this server: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT must all be set.")
+        return
+    threading.Thread(target=_send_all, args=(restaurant_id, payload), daemon=True).start()
 
 
 def notify_new_order(restaurant_id, reference, item_count):
